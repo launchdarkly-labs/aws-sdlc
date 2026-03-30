@@ -23,40 +23,6 @@ from ldclient.config import Config
 from ldai.client import LDAIClient
 from ldai import AIAgentConfigDefault
 
-
-# =============================================================================
-# Bedrock Inference Profile Helpers
-# =============================================================================
-
-def ensure_inference_profile(model_id: str, region_prefix: str = None) -> str:
-    """
-    Auto-correct direct Bedrock model IDs to inference profiles.
-
-    Bedrock requires inference profile format:
-      us.anthropic.claude-3-5-sonnet-20241022-v2:0
-
-    This converts direct model IDs like:
-      anthropic.claude-3-5-sonnet-20241022-v2:0
-    """
-    if not model_id:
-        return model_id
-
-    # Already an inference profile (has region prefix)
-    region_prefixes = ['us.', 'eu.', 'ap.', 'ca.', 'sa.', 'af.', 'me.']
-    if any(model_id.startswith(prefix) for prefix in region_prefixes):
-        return model_id
-
-    # Determine region prefix from environment or default
-    if not region_prefix:
-        aws_region = os.environ.get('AWS_REGION', 'us-west-2')
-        region_prefix = aws_region.split('-')[0]  # us-west-2 → us
-
-    # Convert direct model ID to inference profile
-    if model_id.startswith('anthropic.') or model_id.startswith('amazon.') or model_id.startswith('meta.'):
-        return f"{region_prefix}.{model_id}"
-
-    return model_id
-
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -225,9 +191,6 @@ def generate_code(ai_client: LDAIClient, prompt: str, context_data: dict) -> str
     model_id = agent.model.name if agent.model else "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     instructions = agent.instructions or "You are a helpful code generation assistant."
 
-    # Ensure model ID is in inference profile format
-    model_id = ensure_inference_profile(model_id)
-
     # Invoke Bedrock and track metrics
     response = agent.tracker.track_bedrock_converse_metrics(
         invoke_bedrock(model_id, instructions, prompt)
@@ -316,8 +279,7 @@ Setting up in LaunchDarkly Dashboard:
 
 IMPORTANT - Bedrock Inference Profile Format:
    Bedrock requires inference profile IDs with region prefix.
-   The code auto-corrects if you forget, but it's best to use the
-   correct format in your LaunchDarkly AI Config:
+   Configure this correctly in your LaunchDarkly AI Config:
 
    ✅ Correct: us.anthropic.claude-3-5-sonnet-20241022-v2:0
    ❌ Wrong:   anthropic.claude-3-sonnet-20240229-v1:0
