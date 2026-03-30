@@ -53,9 +53,7 @@ Or use quick install: [flags](https://mcp.launchdarkly.com/mcp/fm/install) | [AI
 
 **Why code generation agent?** Most visible output. Sonnet vs Opus produces noticeably different results.
 
-**Why not custom judges?** Adds complexity (proxy setup, abstract scores). Workshop needs quick, visible demos.
-
-For production, see [Custom Evals tutorial](https://launchdarkly.com/docs/tutorials/custom-evals-claude-code).
+For production evaluations, see [Custom Evals tutorial](https://launchdarkly.com/docs/tutorials/custom-evals-claude-code).
 
 ## Prerequisites
 
