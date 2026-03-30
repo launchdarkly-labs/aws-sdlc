@@ -26,7 +26,7 @@ ldclient.set_config(Config(SDK_KEY))
 ai_client = LDAIClient(ldclient.get())
 
 context = Context.builder("user-123").set("plan", "pro").build()
-agent = ai_client.agent_config("code-gen-agent", context, AIAgentConfigDefault(enabled=False))
+agent = ai_client.agent_config("aidlc-agent", context, AIAgentConfigDefault(enabled=False))
 
 # Bedrock inference profile format required
 bedrock = boto3.client("bedrock-runtime")

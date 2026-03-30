@@ -38,9 +38,9 @@ def generate_code(prompt: str, user_context: dict) -> str:
         .set("complexity", user_context.get("complexity", "standard")) \
         .build()
 
-    # Get AI Config
+    # Get AI Config (key must match what's created in LaunchDarkly)
     agent = ai_client.agent_config(
-        "code-gen-agent",
+        "aidlc-agent",
         context,
         AIAgentConfigDefault(enabled=False),
         user_context
