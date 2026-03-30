@@ -117,6 +117,46 @@ Add progressive delivery to the generated e-commerce app:
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Design Decisions
+
+### Why the Code Generation Agent?
+
+The AI-DLC workshop includes several AI agents (requirements analysis, user stories, workflow planning, application design, code generation). We chose **code generation** for the AI Config integration because:
+
+| Reason | Explanation |
+|--------|-------------|
+| **Most visible output** | Produces actual code that participants can see and evaluate |
+| **Clear model differentiation** | Sonnet vs Opus produces noticeably different quality/verbosity |
+| **Natural targeting scenarios** | Easy to explain rules like "enterprise users get Opus" or "complex projects get enhanced prompts" |
+| **Workshop flow** | Centerpiece of Construction phase—participants have context when they reach the LD integration |
+
+Other agents (requirements, user stories) would work but produce less tangible output for a demo.
+
+### Why Not Add Custom Judges?
+
+LaunchDarkly supports **Online Evaluations** with custom judges that can automatically score AI output for security, correctness, and scope creep. We considered adding this but decided against it:
+
+| Factor | Decision |
+|--------|----------|
+| **Workshop audience** | Learning AI-DLC concepts, not LD power users |
+| **Time constraints** | Workshop has defined phases with specific goals |
+| **Infrastructure overhead** | Judges require proxy setup and additional configuration |
+| **Demo clarity** | "Change model, see different code" is more immediate than "see quality scores" |
+
+The current integration tells a complete story:
+- **Construction Phase**: "Change your model without redeploying" → immediate, visible
+- **Operations Phase**: "Roll out features safely" → toggle flag, see UI change
+
+### Going Further
+
+For production AI systems, consider adding **Online Evaluations** to automatically score generated code:
+
+- **Security Judge** — Check for vulnerabilities (SQL injection, XSS, hardcoded secrets)
+- **Minimal Change Judge** — Ensure the agent doesn't over-engineer
+- **API Contract Judge** — Validate generated code structure
+
+See the [custom-evals demo](https://github.com/launchdarkly/custom-evals) for an example proxy that routes Claude Code through LaunchDarkly with automatic judge execution. This pattern is valuable for comparing model quality at scale but adds complexity beyond the workshop scope.
+
 ## File Structure
 
 ```
