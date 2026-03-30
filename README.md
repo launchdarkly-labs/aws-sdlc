@@ -38,15 +38,12 @@ Or use quick install: [flags](https://mcp.launchdarkly.com/mcp/fm/install) | [AI
 ## What's Here
 
 ```
-├── kiro-power/
-│   ├── Power.md              # MCP config
-│   └── Steering.md           # Agent instructions
 ├── workshop-docs/
-│   ├── construction-ld-aiconfig.md
-│   └── operations-ld-flags.md
+│   ├── construction-ld-aiconfig.md   # AI Configs for iCode agents
+│   └── operations-ld-flags.md        # Feature flags for retail app
 └── examples/
-    ├── aiconfig-agent.py
-    └── frontend-flags.tsx
+    ├── aiconfig-agent.py             # Python + Bedrock example
+    └── frontend-flags.tsx            # React feature flags example
 ```
 
 ## Design Decisions
