@@ -1,42 +1,12 @@
 # LaunchDarkly Integration for AWS AI-DLC Workshop
 
-This repository provides LaunchDarkly integration materials for the [AWS AI-Driven Development Lifecycle (AI-DLC) Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle). It adds feature management capabilities as an overlay without modifying the core workshop.
-
-## What This Repo Provides
-
-| Directory | Contents | Purpose |
-|-----------|----------|---------|
-| `kiro-power/` | Power.md, Steering.md | Kiro Power configuration for AI assistants |
-| `workshop-docs/` | Tutorial markdown files | Step-by-step guides for workshop participants |
-| `examples/` | Python and React code | Working code examples to copy into projects |
-
-## Official LaunchDarkly Resources vs. This Repo
-
-### Official LaunchDarkly Resources
-
-| Resource | Location | What It Is |
-|----------|----------|------------|
-| **Hosted MCP Servers** | `https://mcp.launchdarkly.com/mcp/fm` (flags) <br> `https://mcp.launchdarkly.com/mcp/aiconfigs` (AI Configs) | Production MCP servers that connect AI clients to LaunchDarkly via OAuth |
-| **Official Documentation** | [docs.launchdarkly.com](https://docs.launchdarkly.com) | Comprehensive SDK docs, tutorials, API reference |
-| **Python AI SDK** | [PyPI](https://pypi.org/project/launchdarkly-server-sdk-ai/) / [GitHub](https://github.com/launchdarkly/python-server-sdk-ai) | Official SDK for AI Configs in Python |
-| **React SDK** | [npm](https://www.npmjs.com/package/launchdarkly-react-client-sdk) | Official SDK for feature flags in React |
-| **MCP Server Package** | [@launchdarkly/mcp-server](https://www.npmjs.com/package/@launchdarkly/mcp-server) | Local MCP server (alternative to hosted) |
-
-### This Repository (Workshop-Specific)
-
-| File | Based On | Purpose |
-|------|----------|---------|
-| `kiro-power/Power.md` | [Official MCP docs](https://docs.launchdarkly.com/home/getting-started/mcp-hosted) | Pre-configured MCP setup for workshop participants |
-| `kiro-power/Steering.md` | Workshop requirements | Agent instructions specific to AI-DLC integration |
-| `examples/aiconfig-agent.py` | [Python AI SDK docs](https://docs.launchdarkly.com/sdk/ai/python) | Working example adapted for the workshop's code generation agent |
-| `examples/frontend-flags.tsx` | [React SDK docs](https://docs.launchdarkly.com/sdk/client-side/react) | Working example adapted for AnyCompanyRead e-commerce app |
-| `workshop-docs/*.md` | Original content | Step-by-step tutorials for workshop phases |
+LaunchDarkly overlay for the [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle). Adds feature management without modifying the core workshop.
 
 ## Quick Start
 
-### 1. Configure MCP Servers
+### 1. Configure MCP
 
-Add to your AI client's MCP configuration (Claude Code, Cursor, etc.):
+Add to your AI client (Claude Code, Cursor, etc.):
 
 ```json
 {
@@ -53,138 +23,49 @@ Add to your AI client's MCP configuration (Claude Code, Cursor, etc.):
 }
 ```
 
-Or use the quick install links:
-- [Feature management server](https://mcp.launchdarkly.com/mcp/fm/install)
-- [AI Configs server](https://mcp.launchdarkly.com/mcp/aiconfigs/install)
+Or use quick install: [flags](https://mcp.launchdarkly.com/mcp/fm/install) | [AI Configs](https://mcp.launchdarkly.com/mcp/aiconfigs/install)
 
-### 2. Follow the Workshop Docs
+### 2. Follow the Tutorials
 
-1. **Construction Phase**: Follow [construction-ld-aiconfig.md](workshop-docs/construction-ld-aiconfig.md) to add AI Configs to code generation agents
-2. **Operations Phase**: Follow [operations-ld-flags.md](workshop-docs/operations-ld-flags.md) to add feature flags to the AnyCompanyRead app
+- **Construction Phase**: [AI Configs tutorial](workshop-docs/construction-ld-aiconfig.md) — runtime model/prompt switching
+- **Operations Phase**: [Feature flags tutorial](workshop-docs/operations-ld-flags.md) — progressive rollout for the app
 
-### 3. Use the Code Examples
+### 3. Use the Examples
 
-Copy the examples into your workshop project:
+- `examples/aiconfig-agent.py` — Python + Bedrock + LaunchDarkly AI Config
+- `examples/frontend-flags.tsx` — React feature flags
 
-- `examples/aiconfig-agent.py` - Python agent with LaunchDarkly AI Config
-- `examples/frontend-flags.tsx` - React components with feature flags
-
-## Workshop Integration Points
-
-### Construction Phase: AI Configs
-
-Add runtime model/prompt configuration to AI agents:
+## What's Here
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  AI-DLC Code Generation Agent                           │
-│                                                         │
-│  ┌─────────────┐    ┌──────────────────┐               │
-│  │ User Request │───▶│ LaunchDarkly     │               │
-│  └─────────────┘    │ AI Config        │               │
-│                     │ (model, prompt)  │               │
-│                     └────────┬─────────┘               │
-│                              │                          │
-│                              ▼                          │
-│                     ┌──────────────────┐               │
-│                     │ Claude/GPT/etc   │               │
-│                     │ (configured at   │               │
-│                     │  runtime)        │               │
-│                     └──────────────────┘               │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Operations Phase: Feature Flags
-
-Add progressive delivery to the generated e-commerce app:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  AnyCompanyRead E-commerce App                          │
-│                                                         │
-│  ┌──────────────┐   ┌─────────────────┐                │
-│  │ new-checkout │──▶│ NewCheckout     │ (10% rollout)  │
-│  │ -flow: true  │   └─────────────────┘                │
-│  ├──────────────┤   ┌─────────────────┐                │
-│  │ new-checkout │──▶│ LegacyCheckout  │ (90% control)  │
-│  │ -flow: false │   └─────────────────┘                │
-│  └──────────────┘                                       │
-│                                                         │
-│  ┌──────────────┐   ┌─────────────────┐                │
-│  │ premium-     │──▶│ PremiumFeatures │ (pro/ent only) │
-│  │ features     │   └─────────────────┘                │
-│  └──────────────┘                                       │
-└─────────────────────────────────────────────────────────┘
+├── kiro-power/
+│   ├── Power.md              # MCP config
+│   └── Steering.md           # Agent instructions
+├── workshop-docs/
+│   ├── construction-ld-aiconfig.md
+│   └── operations-ld-flags.md
+└── examples/
+    ├── aiconfig-agent.py
+    └── frontend-flags.tsx
 ```
 
 ## Design Decisions
 
-### Why the Code Generation Agent?
+**Why code generation agent?** Most visible output. Sonnet vs Opus produces noticeably different results.
 
-The AI-DLC workshop includes several AI agents (requirements analysis, user stories, workflow planning, application design, code generation). We chose **code generation** for the AI Config integration because:
+**Why not custom judges?** Adds complexity (proxy setup, abstract scores). Workshop needs quick, visible demos.
 
-| Reason | Explanation |
-|--------|-------------|
-| **Most visible output** | Produces actual code that participants can see and evaluate |
-| **Clear model differentiation** | Sonnet vs Opus produces noticeably different quality/verbosity |
-| **Natural targeting scenarios** | Easy to explain rules like "enterprise users get Opus" or "complex projects get enhanced prompts" |
-| **Workshop flow** | Centerpiece of Construction phase—participants have context when they reach the LD integration |
-
-Other agents (requirements, user stories) would work but produce less tangible output for a demo.
-
-### Why Not Add Custom Judges?
-
-LaunchDarkly supports **Online Evaluations** with custom judges that can automatically score AI output for security, correctness, and scope creep. We considered adding this but decided against it:
-
-| Factor | Decision |
-|--------|----------|
-| **Workshop audience** | Learning AI-DLC concepts, not LD power users |
-| **Time constraints** | Workshop has defined phases with specific goals |
-| **Infrastructure overhead** | Judges require proxy setup and additional configuration |
-| **Demo clarity** | "Change model, see different code" is more immediate than "see quality scores" |
-
-The current integration tells a complete story:
-- **Construction Phase**: "Change your model without redeploying" → immediate, visible
-- **Operations Phase**: "Roll out features safely" → toggle flag, see UI change
-
-### Going Further
-
-For production AI systems, consider adding **Online Evaluations** to automatically score generated code:
-
-- **Security Judge** — Check for vulnerabilities (SQL injection, XSS, hardcoded secrets)
-- **Minimal Change Judge** — Ensure the agent doesn't over-engineer
-- **API Contract Judge** — Validate generated code structure
-
-See the [Custom Evals for Claude Code tutorial](https://launchdarkly.com/docs/tutorials/custom-evals-claude-code) for an example proxy that routes Claude Code through LaunchDarkly with automatic judge execution. This pattern is valuable for comparing model quality at scale but adds complexity beyond the workshop scope.
-
-## File Structure
-
-```
-aws-aisdlc/
-├── README.md                              # This file
-├── .gitignore                             # Git ignore rules
-├── kiro-power/
-│   ├── Power.md                           # MCP server configuration
-│   └── Steering.md                        # Agent integration instructions
-├── workshop-docs/
-│   ├── construction-ld-aiconfig.md        # AI Configs tutorial
-│   └── operations-ld-flags.md             # Feature flags tutorial
-└── examples/
-    ├── aiconfig-agent.py                  # Python AI Config example
-    └── frontend-flags.tsx                 # React feature flags example
-```
+For production, see [Custom Evals tutorial](https://launchdarkly.com/docs/tutorials/custom-evals-claude-code).
 
 ## Prerequisites
 
-- LaunchDarkly account ([free trial](https://launchdarkly.com/start-trial/))
-- Completed AWS AI-DLC workshop setup
-- AI client with MCP support (Claude Code, Cursor, VS Code + Copilot, Windsurf)
+- [LaunchDarkly account](https://launchdarkly.com/start-trial/)
+- AWS AI-DLC workshop setup complete
+- Bedrock Claude models enabled
 
-## Related Links
+## Links
 
 - [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle)
-- [LaunchDarkly Documentation](https://docs.launchdarkly.com)
-- [LaunchDarkly AI Configs](https://docs.launchdarkly.com/home/ai-configs)
-- [LaunchDarkly MCP Server](https://docs.launchdarkly.com/home/getting-started/mcp-hosted)
-- [Python AI SDK Reference](https://docs.launchdarkly.com/sdk/ai/python)
-- [React SDK Reference](https://docs.launchdarkly.com/sdk/client-side/react)
+- [LaunchDarkly Docs](https://docs.launchdarkly.com)
+- [Python AI SDK](https://docs.launchdarkly.com/sdk/ai/python)
+- [React SDK](https://docs.launchdarkly.com/sdk/client-side/react)
