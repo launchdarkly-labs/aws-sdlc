@@ -1,6 +1,6 @@
 # LaunchDarkly Integration for AWS AI-DLC Workshop
 
-Add feature management to the [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle).
+Add feature management to the [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle) using **Agent Skills**.
 
 ---
 
@@ -10,9 +10,28 @@ Complete these tutorials in order:
 
 | When | Tutorial | What You'll Do |
 |------|----------|----------------|
-| **Before starting** | [LaunchDarkly Setup](workshop-docs/launchdarkly-setup.md) | Create account, get keys, install MCP |
+| **Before starting** | [LaunchDarkly Setup](workshop-docs/launchdarkly-setup.md) | Create account, get keys, set up Agent Skills |
 | **After Build and Test** | [Construction Phase](workshop-docs/construction-launchdarkly.md) | Add AI Configs to switch models |
 | **After Operations Overview** | [Operations Phase](workshop-docs/operations-launchdarkly.md) | Add feature flags to control issues |
+
+---
+
+## Agent Skills
+
+This workshop uses **Agent Skills** - text-based playbooks that teach Kiro how to manage LaunchDarkly.
+
+### Included Kiro Steering
+
+The `.kiro/steering/launchdarkly-ai-configs.md` file teaches Kiro the LaunchDarkly workflows, referencing skills from the [Agent Skills repo](https://github.com/launchdarkly/agent-skills).
+
+### Available Skills
+
+| Skill | What It Does |
+|-------|--------------|
+| `/aiconfig-create` | Create AI Configs with model + instructions |
+| `/aiconfig-variations` | Add variations for A/B testing |
+| `/aiconfig-targeting` | Change which users get which variation |
+| `/aiconfig-tools` | Attach function-calling tools |
 
 ---
 
@@ -20,26 +39,15 @@ Complete these tutorials in order:
 
 ### Your Keys
 
-You'll need two keys from LaunchDarkly:
-
 | Key | Starts With | Where to Get It | What It's For |
 |-----|-------------|-----------------|---------------|
-| API Token | `api-` | Account Settings → Authorization | Your AI assistant (MCP) |
+| API Token | `api-` | Account Settings → Authorization | Agent Skills / MCP |
 | SDK Key | `sdk-` | Project Settings → Environments → Test | Your application code |
 
-### MCP Server Config
+### Set API Token
 
-Add to your AI tool's MCP config:
-
-```json
-{
-  "mcpServers": {
-    "launchdarkly": {
-      "command": "npx",
-      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "api-YOUR-TOKEN"]
-    }
-  }
-}
+```bash
+export LAUNCHDARKLY_ACCESS_TOKEN="api-YOUR-TOKEN"
 ```
 
 ### Store SDK Key in AWS
@@ -57,12 +65,16 @@ aws ssm put-parameter \
 
 ### Construction Phase: AI Configs
 
-Switch AI models without redeploying:
+Switch AI models using Agent Skills:
 
 ```
-You (in LaunchDarkly dashboard)
+You (in Kiro)
     │
-    │  Click: Change default from "sonnet" to "opus"
+    │  /aiconfig-targeting
+    │  "Change default for aidlc-agent to opus"
+    ▼
+LaunchDarkly (updates targeting)
+    │
     ▼
 Your Agent (automatically uses new model)
     │
@@ -81,21 +93,23 @@ Control the three workshop issues:
 | `enable-security-group-fix` | Security group rule (missing or present) |
 | `use-correct-health-check` | ALB health path (`/health` or `/actuator/health`) |
 
-Toggle flags in the dashboard → Issues fix/unfix instantly.
-
 ---
 
 ## Files in This Repo
 
 ```
+.kiro/
+└── steering/
+    └── launchdarkly-ai-configs.md   # Kiro steering for Agent Skills
+
 workshop-docs/
-├── launchdarkly-setup.md         # Step 1: Account, keys, MCP setup
-├── construction-launchdarkly.md  # Step 2: AI Configs for model switching
-└── operations-launchdarkly.md    # Step 3: Feature flags for issue control
+├── launchdarkly-setup.md            # Step 1: Account, keys, setup
+├── construction-launchdarkly.md     # Step 2: AI Configs for model switching
+└── operations-launchdarkly.md       # Step 3: Feature flags for issue control
 
 examples/
-├── aiconfig-agent.py             # Python example with Bedrock
-└── frontend-flags.tsx            # React example with feature flags
+├── aiconfig-agent.py                # Python example with Bedrock
+└── frontend-flags.tsx               # React example with feature flags
 ```
 
 ---
@@ -103,6 +117,6 @@ examples/
 ## Links
 
 - [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle)
+- [LaunchDarkly Agent Skills](https://github.com/launchdarkly/agent-skills)
 - [LaunchDarkly Free Trial](https://launchdarkly.com/start-trial/)
 - [LaunchDarkly Docs](https://docs.launchdarkly.com)
-- [LaunchDarkly MCP Server](https://github.com/launchdarkly/mcp-server)

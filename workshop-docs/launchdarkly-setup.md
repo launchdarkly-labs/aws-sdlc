@@ -100,23 +100,39 @@ You now have two keys:
 
 ---
 
-## Step 4: Install the LaunchDarkly MCP Server
+## Step 4: Set Up LaunchDarkly Agent Skills
 
-MCP (Model Context Protocol) lets your AI assistant talk directly to LaunchDarkly.
+Agent Skills are playbooks that teach your AI assistant how to work with LaunchDarkly. This workshop includes a Kiro steering file that references the LaunchDarkly Agent Skills.
 
-### 4a. Find Your MCP Config File
+### 4a. Set Your API Token
 
-The location depends on which AI tool you're using:
+In your terminal, set the API token as an environment variable:
 
-| Tool | Config File Location |
-|------|---------------------|
-| Claude Code | `~/.claude/config.json` |
-| Cursor | `~/.cursor/mcp.json` |
-| Kiro | Check Kiro settings |
+```bash
+export LAUNCHDARKLY_ACCESS_TOKEN="api-YOUR-TOKEN-HERE"
+```
 
-### 4b. Add the LaunchDarkly Server
+**Replace** `api-YOUR-TOKEN-HERE` with your actual API token from Step 2.
 
-Open your config file and add this:
+### 4b. Verify the Steering File
+
+This workshop includes a Kiro steering file at `.kiro/steering/launchdarkly-ai-configs.md` that teaches Kiro the LaunchDarkly workflows.
+
+The steering file references skills from: https://github.com/launchdarkly/agent-skills
+
+### 4c. Test It
+
+Ask Kiro:
+
+```
+Using the LaunchDarkly skills, what can you help me create?
+```
+
+Kiro should mention AI Configs, variations, targeting, and tools.
+
+### Alternative: MCP Server (Claude Code, Cursor)
+
+If you're using Claude Code or Cursor instead of Kiro, you can use the MCP server:
 
 ```json
 {
@@ -134,21 +150,7 @@ Open your config file and add this:
 }
 ```
 
-**Replace** `api-YOUR-TOKEN-HERE` with your actual API token from Step 2.
-
-### 4c. Restart Your AI Tool
-
-Close and reopen Claude Code, Cursor, or Kiro completely.
-
-### 4d. Verify It Works
-
-Ask your AI assistant:
-
-```
-List my LaunchDarkly projects
-```
-
-If it works, you'll see your project name. If not, double-check your API token.
+Add this to `~/.claude/config.json` (Claude Code) or `~/.cursor/mcp.json` (Cursor).
 
 ---
 

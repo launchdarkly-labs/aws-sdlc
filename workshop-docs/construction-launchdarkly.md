@@ -9,41 +9,46 @@ This tutorial adds LaunchDarkly AI Configs to the iCode agent, letting you switc
 ## What You'll Build
 
 By the end of this section, you can:
-1. Change which AI model the iCode agent uses from a web dashboard
+1. Change which AI model the iCode agent uses using Agent Skills
 2. See the model switch happen instantly - no code deploy needed
 
 ---
 
 ## Step 1: Create the AI Config
 
-### 1a. Ask Your AI Assistant
+Use the `/aiconfig-create` skill to create your AI Config.
 
-In Claude Code, Cursor, or Kiro, type:
+### 1a. Create the Config
+
+In Kiro, type:
 
 ```
-Create a LaunchDarkly AI Config with these settings:
-- Key: aidlc-agent
-- Name: AI-DLC Agent
-- Mode: agent
+/aiconfig-create
 
-Add two variations:
-1. Key: sonnet
-   Name: Claude Sonnet (Fast)
-   Model: us.anthropic.claude-3-5-sonnet-20241022-v2:0
-
-2. Key: opus
-   Name: Claude Opus (Powerful)
-   Model: us.anthropic.claude-opus-4-20250514-v1:0
-
-Set sonnet as the default.
+Create an AI Config called "aidlc-agent" in agent mode.
+Use Claude 3.5 Sonnet (us.anthropic.claude-3-5-sonnet-20241022-v2:0) as the model.
+Add instructions: "You are an AI development assistant."
 ```
 
-### 1b. Verify in LaunchDarkly Dashboard
+Kiro will:
+- Create the AI Config
+- Create a "sonnet" variation with the model
+- Verify the config was created
+- Provide a link to view it in LaunchDarkly
 
-1. Go to **https://app.launchdarkly.com**
-2. Click **AI configs** in the left sidebar
-3. You should see **aidlc-agent** in the list
-4. Click on it to see your two variations
+### 1b. Add a Second Variation
+
+```
+/aiconfig-variations
+
+Add a variation called "opus" to aidlc-agent
+using Claude Opus 4 (us.anthropic.claude-opus-4-20250514-v1:0)
+```
+
+### 1c. Verify
+
+Kiro will confirm both variations exist. You can also check at:
+**https://app.launchdarkly.com** → AI configs → aidlc-agent
 
 ---
 
@@ -194,21 +199,21 @@ This means LaunchDarkly is working!
 
 ## Step 4: Switch Models (The Fun Part!)
 
-### 4a. Open LaunchDarkly Dashboard
+Use the `/aiconfig-targeting` skill to change which model is served.
 
-1. Go to **https://app.launchdarkly.com**
-2. Click **AI configs** → **aidlc-agent**
+### 4a. Change to Opus
 
-### 4b. Change the Default Variation
+In Kiro, type:
 
-1. Click the **Targeting** tab
-2. Find **Default rule**
-3. Click the dropdown (currently shows "sonnet")
-4. Select **opus**
-5. Click **Review and save**
-6. Click **Save changes**
+```
+/aiconfig-targeting
 
-### 4c. Run the Agent Again
+Change the default rule for aidlc-agent to serve "opus"
+```
+
+Kiro will update the targeting and confirm the change.
+
+### 4b. Run the Agent Again
 
 ```bash
 python aidlc_agent.py
@@ -222,30 +227,52 @@ Now you should see:
 
 **You just switched AI models without changing any code!**
 
+### 4c. Switch Back to Sonnet
+
+```
+/aiconfig-targeting
+
+Change the default rule for aidlc-agent to serve "sonnet"
+```
+
+No dashboard clicking required.
+
 ---
 
 ## Step 5: Try Different Scenarios
 
 ### Scenario A: A/B Test Models
 
-1. In LaunchDarkly, go to **Targeting** tab
-2. Under **Default rule**, click **Add rollout**
-3. Set:
-   - sonnet: 50%
-   - opus: 50%
-4. Save changes
+Use `/aiconfig-targeting` to split traffic:
+
+```
+/aiconfig-targeting
+
+Update aidlc-agent targeting:
+Set the default rule to a 50/50 rollout between "sonnet" and "opus"
+```
 
 Now half your requests use Sonnet, half use Opus!
 
 ### Scenario B: Use Opus for Complex Tasks
 
-1. In LaunchDarkly, click **+ Add rule**
-2. Configure:
-   - **If** context **key** contains `complex`
-   - **Serve** opus
-3. Save changes
+```
+/aiconfig-targeting
 
-Now you can send different contexts from your code to get different models.
+Update aidlc-agent targeting:
+Add a rule that serves "opus" when context key contains "complex"
+Keep the default rule serving "sonnet"
+```
+
+Now you can send different contexts from your code to get different models:
+
+```python
+# Simple task - gets Sonnet
+context = Context.builder("simple-task").build()
+
+# Complex task - gets Opus
+context = Context.builder("complex-analysis").build()
+```
 
 ---
 
@@ -306,16 +333,31 @@ If it's not there, go back to the Setup Guide and store it.
 
 ### "Config disabled or no model set"
 
-1. Go to LaunchDarkly → AI configs → aidlc-agent
-2. Click **Targeting** tab
-3. Make sure the toggle at the top is **ON**
-4. Make sure Default rule serves a variation (not "off")
+Use skills to check and fix:
+
+```
+/aiconfig-targeting
+
+Check the targeting for aidlc-agent.
+Make sure it's enabled and the default rule serves a variation.
+```
+
+Or manually check: LaunchDarkly → AI configs → aidlc-agent → Targeting tab
 
 ### "Using default model" (LaunchDarkly not working)
 
 - Check your SDK key starts with `sdk-` (not `api-`)
 - Make sure the AI Config key is exactly `aidlc-agent`
 - Verify you're in the right LaunchDarkly project
+
+### Skills not working
+
+Make sure your API token is set:
+```bash
+export LAUNCHDARKLY_ACCESS_TOKEN="api-your-token"
+```
+
+Check that Kiro can see the steering file at `.kiro/steering/launchdarkly-ai-configs.md`
 
 ### Import errors
 
