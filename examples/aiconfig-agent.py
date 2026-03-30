@@ -9,6 +9,10 @@ For the AWS AI-DLC workshop, this pattern enables:
 - A/B testing different prompts
 - Gradual rollout of prompt improvements
 - Per-user or per-project model selection
+
+IMPORTANT: Bedrock requires inference profile IDs with region prefixes.
+Use: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+Not:    anthropic.claude-3-sonnet-20240229-v1:0
 """
 
 import os
@@ -18,6 +22,40 @@ from ldclient import Context
 from ldclient.config import Config
 from ldai.client import LDAIClient
 from ldai import AIAgentConfigDefault
+
+
+# =============================================================================
+# Bedrock Inference Profile Helpers
+# =============================================================================
+
+def ensure_inference_profile(model_id: str, region_prefix: str = None) -> str:
+    """
+    Auto-correct direct Bedrock model IDs to inference profiles.
+
+    Bedrock requires inference profile format:
+      us.anthropic.claude-3-5-sonnet-20241022-v2:0
+
+    This converts direct model IDs like:
+      anthropic.claude-3-5-sonnet-20241022-v2:0
+    """
+    if not model_id:
+        return model_id
+
+    # Already an inference profile (has region prefix)
+    region_prefixes = ['us.', 'eu.', 'ap.', 'ca.', 'sa.', 'af.', 'me.']
+    if any(model_id.startswith(prefix) for prefix in region_prefixes):
+        return model_id
+
+    # Determine region prefix from environment or default
+    if not region_prefix:
+        aws_region = os.environ.get('AWS_REGION', 'us-west-2')
+        region_prefix = aws_region.split('-')[0]  # us-west-2 → us
+
+    # Convert direct model ID to inference profile
+    if model_id.startswith('anthropic.') or model_id.startswith('amazon.') or model_id.startswith('meta.'):
+        return f"{region_prefix}.{model_id}"
+
+    return model_id
 
 # =============================================================================
 # Configuration
@@ -183,9 +221,12 @@ def generate_code(ai_client: LDAIClient, prompt: str, context_data: dict) -> str
         return "Code generation is currently disabled for your account."
 
     # Get model and instructions from the agent config
-    # Bedrock model IDs: anthropic.claude-3-sonnet-20240229-v1:0, anthropic.claude-3-opus-20240229-v1:0
-    model_id = agent.model.name if agent.model else "anthropic.claude-3-sonnet-20240229-v1:0"
+    # Bedrock requires inference profile format: us.anthropic.claude-*
+    model_id = agent.model.name if agent.model else "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     instructions = agent.instructions or "You are a helpful code generation assistant."
+
+    # Ensure model ID is in inference profile format
+    model_id = ensure_inference_profile(model_id)
 
     # Invoke Bedrock and track metrics
     response = agent.tracker.track_bedrock_converse_metrics(
@@ -244,17 +285,17 @@ Setting up in LaunchDarkly Dashboard:
    - Name: Code Generation Agent
    - Provider: bedrock
 
-2. Add variations:
+2. Add variations (use INFERENCE PROFILE format with region prefix):
    - Variation 1: Claude Sonnet (default)
-     - Model: anthropic.claude-3-sonnet-20240229-v1:0
+     - Model: us.anthropic.claude-3-5-sonnet-20241022-v2:0
      - Instructions: [production prompt]
 
    - Variation 2: Claude Opus (premium)
-     - Model: anthropic.claude-3-opus-20240229-v1:0
+     - Model: us.anthropic.claude-opus-4-20250514-v1:0
      - Instructions: [enhanced prompt for complex projects]
 
    - Variation 3: Claude Haiku (fast/cheap)
-     - Model: anthropic.claude-3-haiku-20240307-v1:0
+     - Model: us.anthropic.claude-3-5-haiku-20241022-v1:0
      - Instructions: [concise prompt for simple tasks]
 
 3. Set up targeting:
@@ -273,11 +314,19 @@ Setting up in LaunchDarkly Dashboard:
    - Change targeting in LaunchDarkly dashboard
    - Run again, see different model response (no redeploy!)
 
-Bedrock Model IDs:
-   - anthropic.claude-3-opus-20240229-v1:0
-   - anthropic.claude-3-sonnet-20240229-v1:0
-   - anthropic.claude-3-haiku-20240307-v1:0
-   - anthropic.claude-instant-v1
-   - amazon.titan-text-express-v1
-   - meta.llama3-70b-instruct-v1:0
+IMPORTANT - Bedrock Inference Profile Format:
+   Bedrock requires inference profile IDs with region prefix.
+   The code auto-corrects if you forget, but it's best to use the
+   correct format in your LaunchDarkly AI Config:
+
+   ✅ Correct: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+   ❌ Wrong:   anthropic.claude-3-sonnet-20240229-v1:0
+
+   Available models (us region):
+   - us.anthropic.claude-opus-4-20250514-v1:0      (most capable)
+   - us.anthropic.claude-sonnet-4-20250514-v1:0   (balanced)
+   - us.anthropic.claude-3-5-sonnet-20241022-v2:0 (previous gen)
+   - us.anthropic.claude-3-5-haiku-20241022-v1:0  (fast/cheap)
+
+   For other regions, replace 'us' with: eu, ap, ca, sa, etc.
 """

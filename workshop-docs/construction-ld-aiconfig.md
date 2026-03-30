@@ -129,7 +129,8 @@ class CodeGenerationAgent:
             return "Code generation is currently disabled."
 
         # Get model and instructions from the agent config
-        model_id = agent.model.name if agent.model else "anthropic.claude-3-sonnet-20240229-v1:0"
+        # Bedrock requires inference profile format: us.anthropic.claude-*
+        model_id = agent.model.name if agent.model else "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
 
         # Invoke Bedrock and track metrics
         response = agent.tracker.track_bedrock_converse_metrics(
@@ -166,7 +167,7 @@ class CodeGenerationAgent:
 
 **Variation 1: Sonnet (Default)**
 ```yaml
-Model: anthropic.claude-3-sonnet-20240229-v1:0
+Model: us.anthropic.claude-3-5-sonnet-20241022-v2:0
 Instructions: |
   You are a code generation assistant for the AI-DLC workshop.
   Generate clean, well-documented code following best practices.
@@ -176,7 +177,7 @@ Instructions: |
 
 **Variation 2: Opus (Premium)**
 ```yaml
-Model: anthropic.claude-3-opus-20240229-v1:0
+Model: us.anthropic.claude-opus-4-20250514-v1:0
 Instructions: |
   You are an expert code generation assistant for the AI-DLC workshop.
   Generate production-ready code with comprehensive error handling.
@@ -187,12 +188,14 @@ Instructions: |
 
 **Variation 3: Haiku (Fast)**
 ```yaml
-Model: anthropic.claude-3-haiku-20240307-v1:0
+Model: us.anthropic.claude-3-5-haiku-20241022-v1:0
 Instructions: |
   You are a fast code generation assistant.
   Generate concise, working code quickly.
   Focus on the core implementation without extra explanation.
 ```
+
+> **Important**: Bedrock requires **inference profile format** with region prefix (e.g., `us.anthropic.claude-*`). The `us` prefix routes to US regions. For EU, use `eu.anthropic.claude-*`.
 
 5. Set up targeting rules:
    - **Rule 1**: If `user.plan` = `enterprise` → serve Opus
@@ -265,14 +268,18 @@ You should now see a response from Claude Opus with the enhanced instructions!
 
 ## Bedrock Model Reference
 
-| Model | Bedrock Model ID | Use Case |
-|-------|------------------|----------|
-| Claude 3 Opus | `anthropic.claude-3-opus-20240229-v1:0` | Complex tasks, highest quality |
-| Claude 3 Sonnet | `anthropic.claude-3-sonnet-20240229-v1:0` | Balanced performance/cost |
-| Claude 3 Haiku | `anthropic.claude-3-haiku-20240307-v1:0` | Fast, simple tasks |
-| Claude Instant | `anthropic.claude-instant-v1` | Legacy, very fast |
-| Titan Text | `amazon.titan-text-express-v1` | AWS native option |
-| Llama 3 | `meta.llama3-70b-instruct-v1:0` | Open source alternative |
+Bedrock requires **inference profile IDs** with region prefix. Use `us.` for US regions, `eu.` for Europe, etc.
+
+| Model | Inference Profile ID | Use Case |
+|-------|---------------------|----------|
+| Claude Opus 4 | `us.anthropic.claude-opus-4-20250514-v1:0` | Most capable, complex tasks |
+| Claude Sonnet 4 | `us.anthropic.claude-sonnet-4-20250514-v1:0` | Balanced performance/cost |
+| Claude 3.5 Sonnet | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | Previous gen, proven |
+| Claude 3.5 Haiku | `us.anthropic.claude-3-5-haiku-20241022-v1:0` | Fast, simple tasks |
+| Llama 3 | `us.meta.llama3-70b-instruct-v1:0` | Open source alternative |
+| Titan Text | `us.amazon.titan-text-express-v1:0` | AWS native option |
+
+> **Note**: Replace `us.` with your region prefix (`eu.`, `ap.`, etc.) as needed.
 
 ---
 

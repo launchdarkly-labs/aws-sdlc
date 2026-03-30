@@ -155,7 +155,7 @@ For production AI systems, consider adding **Online Evaluations** to automatical
 - **Minimal Change Judge** — Ensure the agent doesn't over-engineer
 - **API Contract Judge** — Validate generated code structure
 
-See the [custom-evals demo](https://github.com/launchdarkly/custom-evals) for an example proxy that routes Claude Code through LaunchDarkly with automatic judge execution. This pattern is valuable for comparing model quality at scale but adds complexity beyond the workshop scope.
+See the [Custom Evals for Claude Code tutorial](https://launchdarkly.com/docs/tutorials/custom-evals-claude-code) for an example proxy that routes Claude Code through LaunchDarkly with automatic judge execution. This pattern is valuable for comparing model quality at scale but adds complexity beyond the workshop scope.
 
 ## File Structure
 
