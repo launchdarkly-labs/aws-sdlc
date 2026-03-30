@@ -1,8 +1,8 @@
 """
-LaunchDarkly AI Config Integration for AI-DLC Agents
+LaunchDarkly AI Config Integration for AI-DLC Agents (AWS Bedrock)
 
 This example shows how to add runtime model/prompt configuration
-to an AI agent using LaunchDarkly AI Configs.
+to an AI agent using LaunchDarkly AI Configs with AWS Bedrock.
 
 For the AWS AI-DLC workshop, this pattern enables:
 - Changing models without redeployment
@@ -12,7 +12,7 @@ For the AWS AI-DLC workshop, this pattern enables:
 """
 
 import os
-import anthropic
+import boto3
 import ldclient
 from ldclient import Context
 from ldclient.config import Config
@@ -23,17 +23,27 @@ from ldai import AIAgentConfigDefault
 # Configuration
 # =============================================================================
 
-# In production, retrieve from AWS Secrets Manager:
-# import boto3
-# secrets = boto3.client('secretsmanager')
-# SDK_KEY = secrets.get_secret_value(SecretId='launchdarkly/sdk-key')['SecretString']
+# Retrieve LaunchDarkly SDK key from AWS Secrets Manager (recommended)
+def get_ld_sdk_key():
+    """Retrieve LaunchDarkly SDK key from AWS Secrets Manager."""
+    secret_name = os.environ.get("LD_SDK_KEY_SECRET", "launchdarkly/sdk-key")
 
-SDK_KEY = os.environ.get("LAUNCHDARKLY_SDK_KEY", "your-sdk-key-here")
+    # Fall back to environment variable for local development
+    if os.environ.get("LAUNCHDARKLY_SDK_KEY"):
+        return os.environ["LAUNCHDARKLY_SDK_KEY"]
+
+    secrets = boto3.client("secretsmanager")
+    response = secrets.get_secret_value(SecretId=secret_name)
+    return response["SecretString"]
+
 
 # Default configuration used when LD is unavailable
 DEFAULT_CONFIG = AIAgentConfigDefault(
     enabled=False  # Disabled by default when LD unavailable
 )
+
+# AWS Region for Bedrock
+AWS_REGION = os.environ.get("AWS_REGION", "us-west-2")
 
 
 # =============================================================================
@@ -42,7 +52,8 @@ DEFAULT_CONFIG = AIAgentConfigDefault(
 
 def init_launchdarkly():
     """Initialize LaunchDarkly clients for AI Config."""
-    ldclient.set_config(Config(SDK_KEY))
+    sdk_key = get_ld_sdk_key()
+    ldclient.set_config(Config(sdk_key))
     ld_client = ldclient.get()
     ai_client = LDAIClient(ld_client)
     return ld_client, ai_client
@@ -86,10 +97,8 @@ def get_agent_config(ai_client: LDAIClient, agent_key: str, context_data: dict):
     Returns:
         AIAgentConfig with model, instructions, and tracker
     """
-    # Build LaunchDarkly context
     ld_context = build_context(context_data)
 
-    # Get config from LaunchDarkly with fallback to default
     config = ai_client.agent_config(
         agent_key,
         ld_context,
@@ -101,12 +110,62 @@ def get_agent_config(ai_client: LDAIClient, agent_key: str, context_data: dict):
 
 
 # =============================================================================
+# Bedrock Model Invocation
+# =============================================================================
+
+def invoke_bedrock(model_id: str, system_prompt: str, user_message: str) -> dict:
+    """
+    Invoke a model via AWS Bedrock Converse API.
+
+    Args:
+        model_id: Bedrock model ID (e.g., "anthropic.claude-3-sonnet-20240229-v1:0")
+        system_prompt: System instructions for the model
+        user_message: User's prompt
+
+    Returns:
+        Bedrock converse response
+    """
+    client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
+
+    response = client.converse(
+        modelId=model_id,
+        system=[{"text": system_prompt}],
+        messages=[
+            {
+                "role": "user",
+                "content": [{"text": user_message}]
+            }
+        ],
+        inferenceConfig={
+            "maxTokens": 4096,
+            "temperature": 0.7,
+        }
+    )
+
+    return response
+
+
+def extract_response_text(response: dict) -> str:
+    """Extract text content from Bedrock converse response."""
+    output = response.get("output", {})
+    message = output.get("message", {})
+    content = message.get("content", [])
+
+    texts = []
+    for block in content:
+        if "text" in block:
+            texts.append(block["text"])
+
+    return "\n".join(texts)
+
+
+# =============================================================================
 # Code Generation Agent
 # =============================================================================
 
 def generate_code(ai_client: LDAIClient, prompt: str, context_data: dict) -> str:
     """
-    Generate code using LaunchDarkly-configured model and instructions.
+    Generate code using LaunchDarkly-configured model and instructions via Bedrock.
 
     Args:
         ai_client: The LaunchDarkly AI client
@@ -124,26 +183,16 @@ def generate_code(ai_client: LDAIClient, prompt: str, context_data: dict) -> str
         return "Code generation is currently disabled for your account."
 
     # Get model and instructions from the agent config
-    model_name = agent.model.name if agent.model else "claude-sonnet-4-20250514"
+    # Bedrock model IDs: anthropic.claude-3-sonnet-20240229-v1:0, anthropic.claude-3-opus-20240229-v1:0
+    model_id = agent.model.name if agent.model else "anthropic.claude-3-sonnet-20240229-v1:0"
     instructions = agent.instructions or "You are a helpful code generation assistant."
 
-    # Initialize the appropriate model client based on config
-    if "claude" in model_name.lower():
-        client = anthropic.Anthropic()
-        response = client.messages.create(
-            model=model_name,
-            max_tokens=4096,
-            system=instructions,
-            messages=[{"role": "user", "content": prompt}]
-        )
+    # Invoke Bedrock and track metrics
+    response = agent.tracker.track_bedrock_converse_metrics(
+        invoke_bedrock(model_id, instructions, prompt)
+    )
 
-        # Track success with the agent's tracker
-        agent.tracker.track_success()
-
-        return response.content[0].text
-
-    # Add other model providers as needed (OpenAI, etc.)
-    raise ValueError(f"Unsupported model: {model_name}")
+    return extract_response_text(response)
 
 
 # =============================================================================
@@ -151,7 +200,7 @@ def generate_code(ai_client: LDAIClient, prompt: str, context_data: dict) -> str
 # =============================================================================
 
 def main():
-    """Example usage of AI Config integration."""
+    """Example usage of AI Config integration with Bedrock."""
 
     # Initialize LaunchDarkly
     ld_client, ai_client = init_launchdarkly()
@@ -193,23 +242,42 @@ Setting up in LaunchDarkly Dashboard:
 1. Create a new AI Config:
    - Key: code-gen-agent
    - Name: Code Generation Agent
+   - Provider: bedrock
 
 2. Add variations:
    - Variation 1: Claude Sonnet (default)
-     - Model: claude-sonnet-4-20250514
+     - Model: anthropic.claude-3-sonnet-20240229-v1:0
      - Instructions: [production prompt]
 
    - Variation 2: Claude Opus (premium)
-     - Model: claude-opus-4-20250514
+     - Model: anthropic.claude-3-opus-20240229-v1:0
      - Instructions: [enhanced prompt for complex projects]
+
+   - Variation 3: Claude Haiku (fast/cheap)
+     - Model: anthropic.claude-3-haiku-20240307-v1:0
+     - Instructions: [concise prompt for simple tasks]
 
 3. Set up targeting:
    - Rule: If user.plan = "enterprise" → serve Opus variation
    - Rule: If project.complexity = "high" → serve Opus variation
+   - Rule: If project.complexity = "low" → serve Haiku variation
    - Default: Sonnet variation
 
-4. Demo:
+4. AWS Prerequisites:
+   - Enable Claude models in Bedrock console (Model access)
+   - IAM role/user needs bedrock:InvokeModel permission
+   - Set AWS_REGION environment variable if not us-west-2
+
+5. Demo:
    - Run the script, see Sonnet response
-   - Change targeting in dashboard
-   - Run again, see Opus response (no redeploy!)
+   - Change targeting in LaunchDarkly dashboard
+   - Run again, see different model response (no redeploy!)
+
+Bedrock Model IDs:
+   - anthropic.claude-3-opus-20240229-v1:0
+   - anthropic.claude-3-sonnet-20240229-v1:0
+   - anthropic.claude-3-haiku-20240307-v1:0
+   - anthropic.claude-instant-v1
+   - amazon.titan-text-express-v1
+   - meta.llama3-70b-instruct-v1:0
 """

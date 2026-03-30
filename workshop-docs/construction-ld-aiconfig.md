@@ -27,10 +27,26 @@ In the AI-DLC workshop, AI agents generate code, analyze requirements, and perfo
 - Completed the AI-DLC workshop through the "Build and Test" section
 - A LaunchDarkly account (free trial available at launchdarkly.com)
 - AWS CLI configured with appropriate permissions
+- Claude models enabled in AWS Bedrock (Model access in Bedrock console)
 
 ---
 
-## Step 1: Store SDK Key in AWS Secrets Manager
+## Step 1: Enable Bedrock Models
+
+Before using Bedrock, you need to enable model access:
+
+1. Go to the [AWS Bedrock Console](https://console.aws.amazon.com/bedrock)
+2. Navigate to **Model access** in the left sidebar
+3. Click **Manage model access**
+4. Enable the Claude models:
+   - Anthropic Claude 3 Sonnet
+   - Anthropic Claude 3 Opus
+   - Anthropic Claude 3 Haiku
+5. Click **Save changes** and wait for access to be granted
+
+---
+
+## Step 2: Store SDK Key in AWS Secrets Manager
 
 Never hardcode API keys. Store your LaunchDarkly SDK key securely:
 
@@ -46,7 +62,6 @@ Retrieve it in your code:
 
 ```python
 import boto3
-import json
 
 def get_ld_sdk_key():
     """Retrieve LaunchDarkly SDK key from AWS Secrets Manager."""
@@ -57,25 +72,25 @@ def get_ld_sdk_key():
 
 ---
 
-## Step 2: Add AI Config to the Code Generation Agent
+## Step 3: Add AI Config to the Code Generation Agent
 
 ### Install Dependencies
 
 ```bash
-pip install launchdarkly-server-sdk launchdarkly-server-sdk-ai
+pip install launchdarkly-server-sdk launchdarkly-server-sdk-ai boto3
 ```
 
 ### Integrate with Your Agent
 
-Modify your code generation agent to use AI Configs:
+Modify your code generation agent to use AI Configs with Bedrock:
 
 ```python
+import boto3
 import ldclient
 from ldclient import Context
 from ldclient.config import Config
 from ldai.client import LDAIClient
 from ldai import AIAgentConfigDefault
-import anthropic
 
 # Default configuration (used when LD is unavailable)
 DEFAULT_CONFIG = AIAgentConfigDefault(enabled=False)
@@ -88,11 +103,11 @@ class CodeGenerationAgent:
         self.ld_client = ldclient.get()
         self.ai_client = LDAIClient(self.ld_client)
 
-        # Initialize Anthropic client
-        self.anthropic = anthropic.Anthropic()
+        # Initialize Bedrock client
+        self.bedrock = boto3.client("bedrock-runtime", region_name="us-west-2")
 
     def generate(self, prompt: str, context_data: dict) -> str:
-        """Generate code using LD-configured model and instructions."""
+        """Generate code using LD-configured model and instructions via Bedrock."""
 
         # Build LaunchDarkly context for targeting
         ld_context = Context.builder(context_data.get("user_id", "anonymous")) \
@@ -114,20 +129,21 @@ class CodeGenerationAgent:
             return "Code generation is currently disabled."
 
         # Get model and instructions from the agent config
-        model_name = agent.model.name if agent.model else "claude-sonnet-4-20250514"
+        model_id = agent.model.name if agent.model else "anthropic.claude-3-sonnet-20240229-v1:0"
 
-        # Generate using configured model and instructions
-        response = self.anthropic.messages.create(
-            model=model_name,
-            max_tokens=4096,
-            system=agent.instructions,
-            messages=[{"role": "user", "content": prompt}]
+        # Invoke Bedrock and track metrics
+        response = agent.tracker.track_bedrock_converse_metrics(
+            self.bedrock.converse(
+                modelId=model_id,
+                system=[{"text": agent.instructions}],
+                messages=[{"role": "user", "content": [{"text": prompt}]}],
+                inferenceConfig={"maxTokens": 4096, "temperature": 0.7}
+            )
         )
 
-        # Track success
-        agent.tracker.track_success()
-
-        return response.content[0].text
+        # Extract response text
+        content = response.get("output", {}).get("message", {}).get("content", [])
+        return content[0].get("text", "") if content else ""
 
     def close(self):
         self.ld_client.close()
@@ -135,7 +151,7 @@ class CodeGenerationAgent:
 
 ---
 
-## Step 3: Create the AI Config in LaunchDarkly
+## Step 4: Create the AI Config in LaunchDarkly
 
 ### Via the Dashboard
 
@@ -144,12 +160,13 @@ class CodeGenerationAgent:
 3. Configure:
    - **Key**: `code-gen-agent`
    - **Name**: Code Generation Agent
+   - **Provider**: bedrock
 
 4. Add variations:
 
-**Variation 1: Standard (Default)**
+**Variation 1: Sonnet (Default)**
 ```yaml
-Model: claude-sonnet-4-20250514
+Model: anthropic.claude-3-sonnet-20240229-v1:0
 Instructions: |
   You are a code generation assistant for the AI-DLC workshop.
   Generate clean, well-documented code following best practices.
@@ -157,9 +174,9 @@ Instructions: |
   Keep responses focused and concise.
 ```
 
-**Variation 2: Premium**
+**Variation 2: Opus (Premium)**
 ```yaml
-Model: claude-opus-4-20250514
+Model: anthropic.claude-3-opus-20240229-v1:0
 Instructions: |
   You are an expert code generation assistant for the AI-DLC workshop.
   Generate production-ready code with comprehensive error handling.
@@ -168,22 +185,32 @@ Instructions: |
   Provide architectural guidance when relevant.
 ```
 
+**Variation 3: Haiku (Fast)**
+```yaml
+Model: anthropic.claude-3-haiku-20240307-v1:0
+Instructions: |
+  You are a fast code generation assistant.
+  Generate concise, working code quickly.
+  Focus on the core implementation without extra explanation.
+```
+
 5. Set up targeting rules:
-   - **Rule 1**: If `user.plan` = `enterprise` → serve Premium
-   - **Rule 2**: If `project.complexity` = `high` → serve Premium
-   - **Default**: serve Standard
+   - **Rule 1**: If `user.plan` = `enterprise` → serve Opus
+   - **Rule 2**: If `project.complexity` = `high` → serve Opus
+   - **Rule 3**: If `project.complexity` = `low` → serve Haiku
+   - **Default**: serve Sonnet
 
 ### Via MCP (with Kiro)
 
 If you have the LaunchDarkly MCP server configured, you can ask your AI assistant:
 
-> "Create an AI Config called 'code-gen-agent' with two variations:
-> Standard using Claude Sonnet, and Premium using Claude Opus with
-> enhanced instructions. Target Premium to enterprise users."
+> "Create an AI Config called 'code-gen-agent' for Bedrock with three variations:
+> Sonnet as default, Opus for premium users, and Haiku for simple tasks.
+> Target Opus to enterprise users and high-complexity projects."
 
 ---
 
-## Step 4: Demo the Integration
+## Step 5: Demo the Integration
 
 ### Initial Test
 
@@ -205,14 +232,14 @@ result = agent.generate(
 print(result)
 ```
 
-You should see a response generated by Claude Sonnet with standard instructions.
+You should see a response generated by Claude Sonnet via Bedrock.
 
 ### Change Configuration Without Redeploying
 
 1. Go to the LaunchDarkly dashboard
 2. Navigate to your `code-gen-agent` AI Config
 3. Either:
-   - Change the default variation to Premium, or
+   - Change the default variation to Opus, or
    - Add a targeting rule for your test user
 
 4. Run the same code again - **no code changes, no redeploy**
@@ -233,6 +260,19 @@ print(result)
 ```
 
 You should now see a response from Claude Opus with the enhanced instructions!
+
+---
+
+## Bedrock Model Reference
+
+| Model | Bedrock Model ID | Use Case |
+|-------|------------------|----------|
+| Claude 3 Opus | `anthropic.claude-3-opus-20240229-v1:0` | Complex tasks, highest quality |
+| Claude 3 Sonnet | `anthropic.claude-3-sonnet-20240229-v1:0` | Balanced performance/cost |
+| Claude 3 Haiku | `anthropic.claude-3-haiku-20240307-v1:0` | Fast, simple tasks |
+| Claude Instant | `anthropic.claude-instant-v1` | Legacy, very fast |
+| Titan Text | `amazon.titan-text-express-v1` | AWS native option |
+| Llama 3 | `meta.llama3-70b-instruct-v1:0` | Open source alternative |
 
 ---
 
@@ -269,6 +309,16 @@ View results in the LaunchDarkly Experimentation dashboard.
 - Verify targeting rules are configured correctly
 - The SDK caches configs; changes propagate within seconds
 
+### Bedrock Access Denied
+
+```
+AccessDeniedException: You don't have access to the model
+```
+
+- Verify model access is enabled in Bedrock console
+- Check IAM permissions include `bedrock:InvokeModel`
+- Ensure you're using the correct AWS region
+
 ### Connection Issues
 
 ```python
@@ -282,7 +332,7 @@ else:
 ### Missing Dependencies
 
 ```bash
-pip install launchdarkly-server-sdk launchdarkly-server-sdk-ai boto3 anthropic
+pip install launchdarkly-server-sdk launchdarkly-server-sdk-ai boto3
 ```
 
 ---
@@ -291,6 +341,7 @@ pip install launchdarkly-server-sdk launchdarkly-server-sdk-ai boto3 anthropic
 
 You've now added LaunchDarkly AI Configs to the AI-DLC Construction phase:
 
+✅ Bedrock models enabled in AWS console
 ✅ SDK key stored securely in AWS Secrets Manager
 ✅ Code generation agent integrated with AI Configs
 ✅ Multiple model/prompt variations configured

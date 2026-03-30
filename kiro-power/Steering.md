@@ -43,8 +43,9 @@ Activate this agent when the user:
 3. **Add SDK integration** to the agent code
 4. **Test** by changing config in dashboard
 
-Example pattern:
+Example pattern (with AWS Bedrock):
 ```python
+import boto3
 import ldclient
 from ldclient import Context
 from ldclient.config import Config
@@ -53,6 +54,7 @@ from ldai import AIAgentConfigDefault
 
 ldclient.set_config(Config(SDK_KEY))
 ai_client = LDAIClient(ldclient.get())
+bedrock = boto3.client("bedrock-runtime", region_name="us-west-2")
 
 context = Context.builder("user-123").set("plan", "pro").build()
 agent = ai_client.agent_config(
@@ -61,7 +63,12 @@ agent = ai_client.agent_config(
     AIAgentConfigDefault(enabled=False),
     {"custom_var": "value"}  # Optional variables
 )
-# Use agent.model.name, agent.instructions, agent.tracker, etc.
+
+# Use agent.model.name (e.g., "anthropic.claude-3-sonnet-20240229-v1:0")
+# Use agent.instructions, agent.tracker for metrics
+response = agent.tracker.track_bedrock_converse_metrics(
+    bedrock.converse(modelId=agent.model.name, ...)
+)
 ```
 
 ### For Feature Flags (Operations Phase)
