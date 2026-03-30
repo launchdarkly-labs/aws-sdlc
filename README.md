@@ -1,129 +1,108 @@
 # LaunchDarkly Integration for AWS AI-DLC Workshop
 
-LaunchDarkly overlay for the [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle). Adds feature management without modifying the core workshop.
+Add feature management to the [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle).
 
-## Quick Start
+---
 
-### 1. Configure MCP
+## Workshop Flow
 
-Add to your AI client (Claude Code, Cursor, etc.):
+Complete these tutorials in order:
+
+| When | Tutorial | What You'll Do |
+|------|----------|----------------|
+| **Before starting** | [LaunchDarkly Setup](workshop-docs/launchdarkly-setup.md) | Create account, get keys, install MCP |
+| **After Build and Test** | [Construction Phase](workshop-docs/construction-launchdarkly.md) | Add AI Configs to switch models |
+| **After Operations Overview** | [Operations Phase](workshop-docs/operations-launchdarkly.md) | Add feature flags to control issues |
+
+---
+
+## Quick Reference
+
+### Your Keys
+
+You'll need two keys from LaunchDarkly:
+
+| Key | Starts With | Where to Get It | What It's For |
+|-----|-------------|-----------------|---------------|
+| API Token | `api-` | Account Settings → Authorization | Your AI assistant (MCP) |
+| SDK Key | `sdk-` | Project Settings → Environments → Test | Your application code |
+
+### MCP Server Config
+
+Add to your AI tool's MCP config:
 
 ```json
 {
   "mcpServers": {
-    "LaunchDarkly feature management": {
-      "type": "http",
-      "url": "https://mcp.launchdarkly.com/mcp/fm"
-    },
-    "LaunchDarkly AI Configs": {
-      "type": "http",
-      "url": "https://mcp.launchdarkly.com/mcp/aiconfigs"
+    "launchdarkly": {
+      "command": "npx",
+      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "api-YOUR-TOKEN"]
     }
   }
 }
 ```
 
-Or use quick install: [flags](https://mcp.launchdarkly.com/mcp/fm/install) | [AI Configs](https://mcp.launchdarkly.com/mcp/aiconfigs/install)
+### Store SDK Key in AWS
 
-### 2. Follow the Tutorials
-
-- **Construction Phase**: [AI Configs tutorial](workshop-docs/construction-ld-aiconfig.md) — runtime model/prompt switching
-- **Operations Phase**: [Feature flags tutorial](workshop-docs/operations-ld-flags.md) — progressive rollout for the app
-
-### 3. Use the Examples
-
-- `examples/aiconfig-agent.py` — Python + Bedrock + LaunchDarkly AI Config
-- `examples/frontend-flags.tsx` — React feature flags
-
-## What's Here
-
-```
-├── workshop-docs/
-│   ├── construction-ld-aiconfig.md   # AI Configs for iCode agents
-│   └── operations-ld-flags.md        # Feature flags for retail app
-└── examples/
-    ├── aiconfig-agent.py             # Python + Bedrock example
-    └── frontend-flags.tsx            # React feature flags example
-```
-
-## Design Decisions
-
-**Why code generation agent?** Most visible output. Sonnet vs Opus produces noticeably different results.
-
-For production evaluations, see [Custom Evals tutorial](https://launchdarkly.com/docs/tutorials/custom-evals-claude-code).
-
-## Testing the Integration
-
-### Prerequisites
-
-- [LaunchDarkly account](https://launchdarkly.com/start-trial/)
-- AWS AI-DLC workshop environment deployed
-- Bedrock Claude models enabled in your AWS account
-
-### Test 1: Construction Phase (AI Configs)
-
-**Setup in LaunchDarkly:**
-1. Create a new AI Config with key `aidlc-agent`
-2. Add variations for different models:
-   - `sonnet`: `us.anthropic.claude-3-5-sonnet-20241022-v2:0`
-   - `opus`: `us.anthropic.claude-opus-4-20250514-v1:0`
-3. Set default to `sonnet`
-
-**Setup in AWS:**
 ```bash
-# Store your SDK key in SSM
 aws ssm put-parameter \
   --name "/icode/launchdarkly/sdk-key" \
-  --value "sdk-your-key-here" \
+  --value "sdk-YOUR-KEY" \
   --type SecureString
 ```
 
-**Modify the iCode agent:**
-1. Edit `code/agent/common.py` per [construction-ld-aiconfig.md](workshop-docs/construction-ld-aiconfig.md)
-2. Add dependencies to `code/agent/requirements.txt`:
-   ```
-   launchdarkly-server-sdk
-   launchdarkly-server-sdk-ai
-   ```
+---
 
-**Verify:**
-1. Run a code generation task through iCode
-2. Check CloudWatch logs for which model was used
-3. Change the AI Config variation in LaunchDarkly dashboard
-4. Run another task — should use the new model without redeploying
+## What You'll Build
 
-### Test 2: Operations Phase (Feature Flags)
+### Construction Phase: AI Configs
 
-**Setup in LaunchDarkly:**
-Create these boolean flags (all default `false`):
-- `catalog-service-enabled` — scales catalog service to 1 when true
-- `enable-security-group-fix` — adds missing SG rule when true
-- `use-correct-health-check` — uses `/actuator/health` when true
+Switch AI models without redeploying:
 
-**Verify:**
-1. Deploy the retail store app with all flags off (3 issues present)
-2. Confirm issues exist:
-   - Catalog shows errors (service scaled to 0)
-   - Requests timeout (missing SG rule)
-   - ALB returns 502 (wrong health check path)
-3. Toggle `use-correct-health-check` → ALB should start returning 200
-4. Toggle `catalog-service-enabled` → Products should appear
-5. Toggle `enable-security-group-fix` → Full connectivity restored
-
-### Standalone Example Test
-
-Test the Python example without the full workshop:
-
-```bash
-cd examples
-export LAUNCHDARKLY_SDK_KEY="sdk-your-key"
-export AWS_REGION="us-west-2"
-python aiconfig-agent.py
 ```
+You (in LaunchDarkly dashboard)
+    │
+    │  Click: Change default from "sonnet" to "opus"
+    ▼
+Your Agent (automatically uses new model)
+    │
+    │  No code change needed!
+    ▼
+AWS Bedrock (runs Claude Opus instead of Sonnet)
+```
+
+### Operations Phase: Feature Flags
+
+Control the three workshop issues:
+
+| Flag | Controls |
+|------|----------|
+| `catalog-service-enabled` | Catalog service replicas (0 or 1) |
+| `enable-security-group-fix` | Security group rule (missing or present) |
+| `use-correct-health-check` | ALB health path (`/health` or `/actuator/health`) |
+
+Toggle flags in the dashboard → Issues fix/unfix instantly.
+
+---
+
+## Files in This Repo
+
+```
+workshop-docs/
+├── launchdarkly-setup.md         # Step 1: Account, keys, MCP setup
+├── construction-launchdarkly.md  # Step 2: AI Configs for model switching
+└── operations-launchdarkly.md    # Step 3: Feature flags for issue control
+
+examples/
+├── aiconfig-agent.py             # Python example with Bedrock
+└── frontend-flags.tsx            # React example with feature flags
+```
+
+---
 
 ## Links
 
 - [AWS AI-DLC Workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle)
+- [LaunchDarkly Free Trial](https://launchdarkly.com/start-trial/)
 - [LaunchDarkly Docs](https://docs.launchdarkly.com)
-- [Python AI SDK](https://docs.launchdarkly.com/sdk/ai/python)
-- [React SDK](https://docs.launchdarkly.com/sdk/client-side/react)
+- [LaunchDarkly MCP Server](https://github.com/launchdarkly/mcp-server)
