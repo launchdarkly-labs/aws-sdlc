@@ -1,230 +1,79 @@
 # LaunchDarkly Setup Guide
 
-This guide walks you through setting up LaunchDarkly for the AI-DLC workshop. Complete this **before** starting the Construction Phase.
+**Insert after: You've started the Inception Phase**
+
+This quick setup gets you ready for LaunchDarkly integration. Kiro CLI will do the heavy lifting later.
 
 ---
 
 ## What is LaunchDarkly?
 
-LaunchDarkly lets you change how your app works **without redeploying code**. In this workshop, you'll use it to:
+LaunchDarkly lets you change how your app works **without redeploying code**:
 
-- **AI Configs**: Switch between AI models (like Claude Sonnet vs Opus) instantly
+- **AI Configs**: Switch between AI models (Sonnet vs Opus) instantly
 - **Feature Flags**: Turn features on/off for different users
-
-Think of it like a remote control for your application.
 
 ---
 
 ## Step 1: Create a LaunchDarkly Account
 
-### 1a. Sign Up
-
-1. Open your browser and go to: **https://launchdarkly.com/start-trial/**
+1. Open a new browser tab: **https://launchdarkly.com/start-trial/**
 
 2. Click **Start free trial**
 
-3. Fill in the form:
-   - **Email**: Your email address
-   - **Password**: Create a password
-   - Click **Create account**
+3. Fill in the form and click **Create account**
 
 4. Check your email and click the verification link
 
-5. Complete the onboarding questions (you can skip these)
+5. Skip the onboarding questions
 
-You now have a LaunchDarkly account with a 14-day free trial.
+You now have a 14-day free trial.
 
 ---
 
 ## Step 2: Get Your API Access Token
 
-The API token lets your AI assistant (Claude Code, Cursor, Kiro) create configs and flags for you.
+### 2a. Navigate to Authorization
 
-### 2a. Navigate to Authorization Settings
-
-1. In LaunchDarkly, click your **profile icon** (bottom-left corner)
-
+1. In LaunchDarkly, click your **profile icon** (bottom-left)
 2. Click **Account settings**
-
-3. In the left sidebar, click **Authorization**
+3. Click **Authorization** in the left sidebar
 
 ### 2b. Create the Token
 
-1. Click **+ Create token** (top-right)
-
+1. Click **+ Create token**
 2. Fill in:
    - **Name**: `workshop-token`
-   - **Role**: Select **Writer** (important!)
-
+   - **Role**: **Writer** (important!)
 3. Click **Create token**
-
-4. **IMPORTANT**: Copy the token immediately - it starts with `api-` and you won't see it again!
-
-5. Save it somewhere safe (a text file on your desktop is fine for now)
+4. **Copy the token immediately** - starts with `api-`, you won't see it again!
+5. Save it somewhere safe
 
 ```
-Example token format:
-api-12345678-abcd-1234-efgh-123456789012
+Example: api-12345678-abcd-1234-efgh-123456789012
 ```
+
+> **Security**: Never paste your token in chat windows!
 
 ---
 
-## Step 3: Get Your SDK Key
+## You're Done (For Now)
 
-The SDK key lets your application code connect to LaunchDarkly at runtime.
+That's all you need during Inception. Save your API token securely.
 
-### 3a. Find Your Project Settings
+When you reach the **Construction Phase** and start Kiro CLI, you'll connect it to LaunchDarkly and Kiro will:
+- Create a LaunchDarkly project
+- Create the AI Config with model variations
+- Get the SDK key and store it in AWS
+- Set up everything for you
 
-1. In LaunchDarkly, click **Projects** in the left sidebar
-
-2. Click on **default** (or your project name)
-
-3. Click the **Environments** tab
-
-### 3b. Copy the SDK Key
-
-1. Find the **Test** environment
-
-2. Click the **copy icon** next to the SDK key
-
-3. Save this key - it starts with `sdk-`
-
-```
-Example SDK key format:
-sdk-12345678-abcd-1234-efgh-123456789012
-```
-
-You now have two keys:
-- **API token** (`api-...`) - for your AI assistant
-- **SDK key** (`sdk-...`) - for your application code
+Continue with the Inception Phase → [Construction Phase LaunchDarkly](./construction-launchdarkly.md)
 
 ---
 
-## Step 4: Set Up LaunchDarkly Agent Skills
+## Quick Reference
 
-Agent Skills are playbooks that teach your AI assistant how to work with LaunchDarkly. This workshop includes a Kiro steering file that references the LaunchDarkly Agent Skills.
-
-### 4a. Set Your API Token
-
-In your terminal, set the API token as an environment variable:
-
-```bash
-export LAUNCHDARKLY_ACCESS_TOKEN="api-YOUR-TOKEN-HERE"
-```
-
-**Replace** `api-YOUR-TOKEN-HERE` with your actual API token from Step 2.
-
-### 4b. Verify the Steering File
-
-This workshop includes a Kiro steering file at `.kiro/steering/launchdarkly-ai-configs.md` that teaches Kiro the LaunchDarkly workflows.
-
-The steering file references skills from: https://github.com/launchdarkly/agent-skills
-
-### 4c. Test It
-
-Ask Kiro:
-
-```
-Using the LaunchDarkly skills, what can you help me create?
-```
-
-Kiro should mention AI Configs, variations, targeting, and tools.
-
-### Alternative: MCP Server (Claude Code, Cursor)
-
-If you're using Claude Code or Cursor instead of Kiro, you can use the MCP server:
-
-```json
-{
-  "mcpServers": {
-    "launchdarkly": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@launchdarkly/mcp-server",
-        "--access-token",
-        "api-YOUR-TOKEN-HERE"
-      ]
-    }
-  }
-}
-```
-
-Add this to `~/.claude/config.json` (Claude Code) or `~/.cursor/mcp.json` (Cursor).
-
----
-
-## Step 5: Store Your SDK Key in AWS
-
-Your application code needs the SDK key to connect to LaunchDarkly. We'll store it securely in AWS SSM Parameter Store.
-
-### 5a. Open Your Terminal
-
-In the workshop IDE, open a new terminal.
-
-### 5b. Run This Command
-
-```bash
-aws ssm put-parameter \
-  --name "/icode/launchdarkly/sdk-key" \
-  --value "sdk-YOUR-SDK-KEY-HERE" \
-  --type SecureString \
-  --overwrite
-```
-
-**Replace** `sdk-YOUR-SDK-KEY-HERE` with your actual SDK key from Step 3.
-
-### 5c. Verify It Worked
-
-```bash
-aws ssm get-parameter --name "/icode/launchdarkly/sdk-key" --with-decryption
-```
-
-You should see your SDK key in the output.
-
----
-
-## You're Ready!
-
-You now have:
-- A LaunchDarkly account
-- An API token (for your AI assistant)
-- An SDK key (stored in AWS)
-- MCP server installed
-
-Continue to the next section to create your first AI Config.
-
----
-
-## Troubleshooting
-
-### "Command not found: npx"
-
-Install Node.js first:
-```bash
-# On Mac
-brew install node
-
-# On Linux
-sudo apt install nodejs npm
-```
-
-### "Invalid API token"
-
-- Make sure your token starts with `api-` (not `sdk-`)
-- Check you copied the full token
-- Verify the token has **Writer** role (not Reader)
-
-### "MCP server not connecting"
-
-1. Check your config file syntax (valid JSON?)
-2. Restart your AI tool completely
-3. Try running the MCP server manually to see errors:
-   ```bash
-   npx -y @launchdarkly/mcp-server --access-token api-YOUR-TOKEN
-   ```
-
-### "SSM parameter error"
-
-- Make sure you're logged into AWS: `aws sts get-caller-identity`
-- Check you have permission to write to SSM
+| What | Format | When You Need It |
+|------|--------|------------------|
+| API Token | `api-...` | Construction phase (for Kiro CLI) |
+| SDK Key | `sdk-...` | Kiro will get this for you |

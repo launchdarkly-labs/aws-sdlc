@@ -10,9 +10,26 @@ Complete these tutorials in order:
 
 | When | Tutorial | What You'll Do |
 |------|----------|----------------|
-| **Before starting** | [LaunchDarkly Setup](workshop-docs/launchdarkly-setup.md) | Create account, get keys, set up Agent Skills |
-| **After Build and Test** | [Construction Phase](workshop-docs/construction-launchdarkly.md) | Add AI Configs to switch models |
+| **After starting Inception** | [LaunchDarkly Setup](workshop-docs/launchdarkly-setup.md) | Create account, get API token (2 min) |
+| **After Build and Test** | [Construction Phase](workshop-docs/construction-launchdarkly.md) | Kiro CLI sets up everything for you |
 | **After Operations Overview** | [Operations Phase](workshop-docs/operations-launchdarkly.md) | Add feature flags to control issues |
+
+```
+Inception Phase
+    │
+    └── ★ LaunchDarkly Setup (just get your API token)
+    │
+Construction Phase (after Build and Test)
+    │
+    └── ★ Kiro CLI does the work:
+    │       /mcp add launchdarkly ...
+    │       "Set up LaunchDarkly for this workshop..."
+    │       → Creates project, AI Config, stores SDK key
+    │
+Operations Phase (after Overview)
+    │
+    └── ★ Feature Flags for issue control
+```
 
 ---
 
@@ -28,6 +45,7 @@ The `.kiro/steering/launchdarkly-ai-configs.md` file teaches Kiro the LaunchDark
 
 | Skill | What It Does |
 |-------|--------------|
+| `/aiconfig-projects` | Create a LaunchDarkly project for the workshop |
 | `/aiconfig-create` | Create AI Configs with model + instructions |
 | `/aiconfig-variations` | Add variations for A/B testing |
 | `/aiconfig-targeting` | Change which users get which variation |

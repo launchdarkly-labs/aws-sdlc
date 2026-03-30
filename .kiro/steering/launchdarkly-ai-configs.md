@@ -1,50 +1,66 @@
 # LaunchDarkly AI Configs Integration
 
-When working with LaunchDarkly AI Configs, follow the workflows from the LaunchDarkly Agent Skills repository.
+When the LaunchDarkly MCP server is connected, you can manage AI Configs and feature flags directly.
 
-## Reference
+## Connecting MCP
 
-Agent Skills repo: https://github.com/launchdarkly/agent-skills
+```
+/mcp add launchdarkly npx -y @launchdarkly/mcp-server --access-token $LAUNCHDARKLY_ACCESS_TOKEN
+```
 
-## Available Skills
+## Available Capabilities
 
-### /aiconfig-create
-Create AI Configs with model configuration and instructions.
-- Choose agent mode (for multi-step workflows) or completion mode (for single responses)
-- Two-step process: create config first, then create variations
-- Always verify via API after creation
+Once connected, you can:
 
-### /aiconfig-variations
-Add or update variations in an AI Config.
-- Each variation has: model, instructions/messages, parameters
-- Use for A/B testing different models or prompts
-- modelConfigKey format: `{Provider}.{model-id}` (e.g., `Bedrock.us.anthropic.claude-3-5-sonnet-20241022-v2:0`)
+### Projects
+- Create new LaunchDarkly projects
+- List existing projects
+- Get project details and SDK keys
 
-### /aiconfig-targeting
-Configure targeting rules to control which users get which variation.
-- Target by user attributes (plan, subscription_status, etc.)
-- Set percentage rollouts for experiments
-- Change the default variation
+### AI Configs
+- Create AI Configs in agent or completion mode
+- Add variations with different models and instructions
+- Configure targeting rules (who gets which variation)
+- Set up percentage rollouts for A/B testing
 
-### /aiconfig-tools
-Create and attach tools for function calling.
-- Define tool schemas in LaunchDarkly
-- Attach tools to AI Config variations
-- Tools are created separately, then attached via PATCH
+### Feature Flags
+- Create boolean or multivariate flags
+- Configure targeting rules
+- Toggle flags on/off
 
-## API Token
+## Common Workflows
 
-Skills require a LaunchDarkly API access token with `ai-configs:write` permission.
+### Set Up AI Config for Model Switching
 
-Check for token in:
-1. Environment variable: `LAUNCHDARKLY_ACCESS_TOKEN`
-2. Prompt user if not found
+```
+Create an AI Config called "aidlc-agent" in agent mode with:
+- A "sonnet" variation using model us.anthropic.claude-3-5-sonnet-20241022-v2:0
+- An "opus" variation using model us.anthropic.claude-opus-4-20250514-v1:0
+- Default targeting to serve "sonnet"
+```
 
-## Workflow Pattern
+### Switch Models
 
-1. Understand the use case (what framework, what capabilities needed)
-2. Create the AI Config with `/aiconfig-create`
-3. Add variations with `/aiconfig-variations`
-4. Configure targeting with `/aiconfig-targeting`
-5. Verify the config was created correctly
-6. Integrate with application code using the LaunchDarkly AI SDK
+```
+Change the aidlc-agent AI Config targeting to serve "opus"
+```
+
+### A/B Test Models
+
+```
+Update aidlc-agent targeting to a 50/50 rollout between "sonnet" and "opus"
+```
+
+### Store SDK Key in AWS
+
+```
+Get the SDK key for the Test environment and store it in AWS SSM at /icode/launchdarkly/sdk-key
+```
+
+## Model IDs for AWS Bedrock
+
+| Model | Bedrock Model ID |
+|-------|------------------|
+| Claude 3.5 Sonnet | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| Claude Opus 4 | `us.anthropic.claude-opus-4-20250514-v1:0` |
+| Claude Sonnet 4 | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
