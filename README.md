@@ -11,7 +11,8 @@ Complete these tutorials in order:
 | When | Tutorial | What You'll Do |
 |------|----------|----------------|
 | **After starting Inception** | [LaunchDarkly Setup](workshop-docs/launchdarkly-setup.md) | Create account, get API token (2 min) |
-| **After Build and Test** | [Construction Phase](workshop-docs/construction-launchdarkly.md) | Kiro CLI sets up everything for you |
+| **During Code Generation** | [Construction Phase](workshop-docs/construction-launchdarkly.md) | Ask Kiro to add AI recommendations feature |
+| **After Build and Test** | [Construction Phase](workshop-docs/construction-launchdarkly.md) | Connect LaunchDarkly, control the AI model |
 | **After Operations Overview** | [Operations Phase](workshop-docs/operations-launchdarkly.md) | Add feature flags to control issues |
 
 ```

@@ -1,8 +1,25 @@
 # LaunchDarkly AI Configs - Construction Phase
 
-**Insert after: Build and Test stage completes**
-
 Add AI-powered book recommendations to your AnyCompanyRead bookstore, controlled by LaunchDarkly AI Configs.
+
+---
+
+## Before You Start: Add Recommendations During Code Generation
+
+**Important**: During the AI-DLC Code Generation phase, ask Kiro to include the recommendations feature:
+
+```
+Also add a recommendations-handler Lambda that:
+- Takes a userId and returns 3 personalized book recommendations
+- Uses Amazon Bedrock Claude to generate recommendations based on the user's order history
+- Store the model ID in an environment variable BEDROCK_MODEL_ID (default: us.anthropic.claude-3-5-sonnet-20241022-v2:0)
+```
+
+This ensures the app has an AI feature we can control with LaunchDarkly.
+
+---
+
+**Continue below after Build and Test completes**
 
 ---
 
