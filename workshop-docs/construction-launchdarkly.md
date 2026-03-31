@@ -16,37 +16,59 @@ By the end of this section:
 
 ## Step 1: Connect LaunchDarkly to Kiro CLI
 
-### 1a. Create the MCP config file
+### 1a. Set your API token
 
-In your **bash terminal**, run these commands (replace `api-YOUR-TOKEN` with your actual token):
+In your **bash terminal**, set your token as an environment variable:
+
+```bash
+export LAUNCHDARKLY_API_TOKEN="api-YOUR-TOKEN-HERE"
+```
+
+### 1b. Create the MCP config file
+
+Now run this command (it uses the token you just set):
 
 ```bash
 mkdir -p .kiro/settings
-cat > .kiro/settings/mcp.json << 'EOF'
+```
+
+```bash
+cat > .kiro/settings/mcp.json << EOF
 {
   "mcpServers": {
     "launchdarkly": {
       "command": "npx",
-      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "api-YOUR-TOKEN"]
+      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "$LAUNCHDARKLY_API_TOKEN"]
     }
   }
 }
 EOF
 ```
 
-**Important**: Edit the file to replace `api-YOUR-TOKEN` with your actual API token.
+### 1c. Verify the file was created
 
-### 1b. Restart Kiro CLI
+```bash
+cat .kiro/settings/mcp.json
+```
 
-Exit Kiro CLI (type `exit` or Ctrl+C) and restart it:
+You should see your actual token in the output (not the variable name).
+
+### 1d. Restart Kiro CLI
+
+Exit Kiro CLI and restart it:
+
+```
+/quit
+```
 
 ```bash
 kiro-cli
 ```
 
-### 1c. Verify
+### 1e. Verify
 
-In Kiro CLI:
+In Kiro CLI, type:
+
 ```
 /mcp list
 ```
