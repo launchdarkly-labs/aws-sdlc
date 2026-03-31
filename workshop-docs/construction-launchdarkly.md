@@ -2,14 +2,14 @@
 
 **Insert after: Build and Test stage completes**
 
-Now that you have Kiro CLI, let it set up LaunchDarkly for you.
+Add AI-powered book recommendations to your AnyCompanyRead bookstore, controlled by LaunchDarkly AI Configs.
 
 ---
 
 ## What You'll Build
 
 By the end of this section:
-1. Kiro CLI will create your LaunchDarkly project and AI Config
+1. Your bookstore has AI-powered book recommendations
 2. You can switch AI models instantly - no code deploy needed
 
 ---
@@ -42,11 +42,9 @@ kiro-cli mcp add \
 kiro-cli
 ```
 
-Wait for the MCP server to initialize (you'll see "launchdarkly" loading).
+Wait for the MCP server to initialize.
 
 ### 1d. Verify MCP is connected
-
-In Kiro CLI, type:
 
 ```
 /mcp list
@@ -56,87 +54,78 @@ You should see `launchdarkly` in the list.
 
 ---
 
-## Step 2: Let Kiro Set Up Everything
+## Step 2: Create the AI Config
 
-Now ask Kiro CLI to do all the LaunchDarkly setup:
+Ask Kiro to create an AI Config for book recommendations:
 
 ```
-Set up LaunchDarkly for this workshop:
+Create a LaunchDarkly AI Config for book recommendations:
 
-1. Create a project called "aidlc-workshop" (key: aidlc-workshop)
-2. Create an AI Config called "aidlc-agent" in agent mode with:
+1. Create a project called "anycompanyread" (key: anycompanyread) if it doesn't exist
+2. Create an AI Config called "book-recommendations" in completion mode with:
    - A "sonnet" variation using model us.anthropic.claude-3-5-sonnet-20241022-v2:0
+     Instructions: "You are a book recommendation assistant. Given a user's reading history and preferences, suggest 3 relevant books with brief explanations."
    - An "opus" variation using model us.anthropic.claude-opus-4-20250514-v1:0
+     Instructions: "You are an expert literary advisor. Analyze the user's reading patterns and provide 3 thoughtful, personalized book recommendations with detailed explanations of why each book would appeal to them."
    - Default targeting to serve "sonnet"
-3. Get the SDK key for the Test environment
-4. Store the SDK key in AWS SSM at /icode/launchdarkly/sdk-key as a SecureString
+3. Get the SDK key for the Test environment and tell me what it is
 ```
 
-Kiro will use the LaunchDarkly MCP tools to create everything and confirm when done.
+### 2b. Store the SDK Key
 
-### 2b. Verify in LaunchDarkly
+Copy the SDK key Kiro gives you and store it in AWS SSM:
+
+```bash
+aws ssm put-parameter \
+  --name "/anycompanyread/launchdarkly/sdk-key" \
+  --value "sdk-YOUR-SDK-KEY" \
+  --type SecureString \
+  --overwrite
+```
+
+### 2c. Verify in LaunchDarkly
 
 Check **https://app.launchdarkly.com**:
-- Projects → aidlc-workshop
-- AI configs → aidlc-agent (with sonnet and opus variations)
+- Projects → anycompanyread
+- AI configs → book-recommendations
 
 ---
 
-## Step 3: Add LaunchDarkly to the Agent Code
+## Step 3: Add Recommendations to the Bookstore
 
-### 3a. Install the Python Packages
-
-In your **bash terminal**:
-
-```bash
-cd /home/ec2-user/environment/code/agent
-pip install launchdarkly-server-sdk launchdarkly-server-sdk-ai
-```
-
-### 3b. Update requirements.txt
-
-Add to `code/agent/requirements.txt`:
+Ask Kiro to add the AI recommendations feature:
 
 ```
-launchdarkly-server-sdk
-launchdarkly-server-sdk-ai
+Add an AI-powered book recommendations feature to the AnyCompanyRead app:
+
+1. Install launchdarkly-server-sdk and launchdarkly-server-sdk-ai
+2. Create a recommendations API endpoint that:
+   - Gets the SDK key from AWS SSM at /anycompanyread/launchdarkly/sdk-key
+   - Uses the LaunchDarkly AI SDK to get the "book-recommendations" config
+   - Sends the user's reading history to the AI model
+   - Returns 3 book recommendations
+3. Add a "Recommended for You" section to the homepage that calls this endpoint
 ```
 
-### 3c. Update common.py
-
-Ask Kiro CLI to update the agent code:
-
-```
-Update code/agent/common.py to use LaunchDarkly AI Config:
-
-1. Add imports for ldclient, Context, LDConfig, LDAIClient, AIAgentConfigDefault
-2. Change DEFAULT_MODEL_ID to 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
-3. Add a get_model_from_launchdarkly() function that:
-   - Gets SDK key from AWS SSM at /icode/launchdarkly/sdk-key
-   - Initializes the LaunchDarkly client
-   - Gets the model from AI Config "aidlc-agent"
-   - Falls back to DEFAULT_MODEL_ID if not configured
-4. Set BEDROCK_MODEL_ID = get_model_from_launchdarkly()
-```
-
-Kiro will make the code changes for you.
+Kiro will create the backend endpoint and frontend component.
 
 ---
 
 ## Step 4: Test It
 
-### 4a. Run the Agent
+### 4a. Run the App
 
 ```bash
-cd /home/ec2-user/environment/code/agent
-python aidlc_agent.py
+npm run dev
 ```
 
-### 4b. Check the Logs
+### 4b. Check the Recommendations
 
-Look for:
+Visit the homepage - you should see personalized book recommendations.
+
+Check the logs for:
 ```
-[LaunchDarkly] Using model from LaunchDarkly: us.anthropic.claude-3-5-sonnet-20241022-v2:0
+[LaunchDarkly] Using model: us.anthropic.claude-3-5-sonnet-20241022-v2:0
 ```
 
 ---
@@ -145,30 +134,23 @@ Look for:
 
 ### 5a. Change to Opus
 
-Ask Kiro CLI:
+Ask Kiro:
 
 ```
-Change the aidlc-agent AI Config default targeting to serve "opus" instead of "sonnet"
+Change the book-recommendations AI Config to serve "opus" instead of "sonnet"
 ```
 
-### 5b. Run the Agent Again
+### 5b. Refresh the App
 
-```bash
-python aidlc_agent.py
-```
-
-Now you should see:
-```
-[LaunchDarkly] Using model from LaunchDarkly: us.anthropic.claude-opus-4-20250514-v1:0
-```
-
-**You switched AI models without changing any code!**
+The recommendations should now be more detailed (Opus provides richer explanations).
 
 ### 5c. Switch Back
 
 ```
-Change aidlc-agent targeting back to serve "sonnet"
+Change book-recommendations targeting back to "sonnet"
 ```
+
+**You switched AI models without changing any code!**
 
 ---
 
@@ -176,22 +158,39 @@ Change aidlc-agent targeting back to serve "sonnet"
 
 ```
 ┌──────────────────┐
-│  Your Code       │
-│  (common.py)     │
+│  User visits     │
+│  bookstore       │
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  Recommendations │
+│  API endpoint    │
 └────────┬─────────┘
          │ "What model should I use?"
          ▼
 ┌──────────────────┐
 │  LaunchDarkly    │
 │  AI Config       │
-│  aidlc-agent     │
+│  book-recs:      │
+│  - sonnet (fast) │
+│  - opus (rich)   │
 └────────┬─────────┘
-         │ "Use claude-3-5-sonnet..."
+         │
          ▼
 ┌──────────────────┐
 │  AWS Bedrock     │
+│  (generates recs)│
 └──────────────────┘
 ```
+
+---
+
+## What You Learned
+
+- AI Configs let you change models without redeploying
+- Different models have different strengths (speed vs quality)
+- You can A/B test models to find the best user experience
 
 ---
 
@@ -205,23 +204,20 @@ Continue to [Operations Phase LaunchDarkly](./operations-launchdarkly.md) to add
 
 ### MCP not connecting
 
-Check your config file exists and has the right token:
+Check your token is set:
 ```bash
-cat .kiro/settings/mcp.json
+echo $LAUNCHDARKLY_API_TOKEN
 ```
-
-Make sure:
-- The token starts with `api-` (not `sdk-`)
-- The JSON is valid (no trailing commas)
-- You restarted `kiro-cli` after creating the file
 
 ### "SDK key not found"
 
-Ask Kiro to check:
-```
-Check if the SDK key is stored in AWS SSM at /icode/launchdarkly/sdk-key
+Verify the SSM parameter:
+```bash
+aws ssm get-parameter --name "/anycompanyread/launchdarkly/sdk-key" --with-decryption
 ```
 
-### Fallback: Manual Setup
+### Recommendations not showing
 
-If MCP doesn't work, see [Manual Setup Guide](./launchdarkly-manual-setup.md) to create configs via the LaunchDarkly UI.
+- Check browser console for errors
+- Verify the API endpoint is running
+- Check LaunchDarkly AI Config is enabled
