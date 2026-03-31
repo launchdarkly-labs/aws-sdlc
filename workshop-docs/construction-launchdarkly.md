@@ -24,48 +24,27 @@ In your **bash terminal**, set your token as an environment variable:
 export LAUNCHDARKLY_API_TOKEN="api-YOUR-TOKEN-HERE"
 ```
 
-### 1b. Create the MCP config file
-
-Now run this command (it uses the token you just set):
+### 1b. Add the LaunchDarkly MCP server
 
 ```bash
-mkdir -p .kiro/settings
+kiro-cli mcp add \
+  --name launchdarkly \
+  --scope workspace \
+  --command npx \
+  --args "-y" --args "@launchdarkly/mcp-server" \
+  --env LAUNCHDARKLY_API_TOKEN=$LAUNCHDARKLY_API_TOKEN \
+  --force
 ```
 
-```bash
-cat > .kiro/settings/mcp.json << EOF
-{
-  "mcpServers": {
-    "launchdarkly": {
-      "command": "npx",
-      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "$LAUNCHDARKLY_API_TOKEN"]
-    }
-  }
-}
-EOF
-```
-
-### 1c. Verify the file was created
-
-```bash
-cat .kiro/settings/mcp.json
-```
-
-You should see your actual token in the output (not the variable name).
-
-### 1d. Restart Kiro CLI
-
-Exit Kiro CLI and restart it:
-
-```
-/quit
-```
+### 1c. Start Kiro CLI
 
 ```bash
 kiro-cli
 ```
 
-### 1e. Verify
+Wait for the MCP server to initialize (you'll see "launchdarkly" loading).
+
+### 1d. Verify MCP is connected
 
 In Kiro CLI, type:
 
