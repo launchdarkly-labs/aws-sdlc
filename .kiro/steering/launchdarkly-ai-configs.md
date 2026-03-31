@@ -4,9 +4,25 @@ When the LaunchDarkly MCP server is connected, you can manage AI Configs and fea
 
 ## Connecting MCP
 
+In bash terminal:
+```bash
+export LAUNCHDARKLY_ACCESS_TOKEN="api-YOUR-TOKEN"
+kiro-cli mcp add --name launchdarkly --command npx --args "-y" "@launchdarkly/mcp-server" "--access-token" "$LAUNCHDARKLY_ACCESS_TOKEN"
 ```
-/mcp add launchdarkly npx -y @launchdarkly/mcp-server --access-token $LAUNCHDARKLY_ACCESS_TOKEN
+
+Or add to `.kiro/settings/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "launchdarkly": {
+      "command": "npx",
+      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "api-YOUR-TOKEN"]
+    }
+  }
+}
 ```
+
+Then restart `kiro-cli`.
 
 ## Available Capabilities
 

@@ -18,7 +18,7 @@ By the end of this section:
 
 ### 1a. Set your API token
 
-In your **bash terminal** (not Kiro CLI), set your API token:
+In your **bash terminal**, set your API token:
 
 ```bash
 export LAUNCHDARKLY_ACCESS_TOKEN="api-YOUR-TOKEN-HERE"
@@ -28,14 +28,34 @@ Replace with your actual token from the Setup Guide.
 
 ### 1b. Connect the MCP server
 
-In **Kiro CLI**, run:
+In your **bash terminal**, run:
 
+```bash
+kiro-cli mcp add --name launchdarkly --command npx --args "-y" "@launchdarkly/mcp-server" "--access-token" "$LAUNCHDARKLY_ACCESS_TOKEN"
 ```
-/mcp add launchdarkly npx -y @launchdarkly/mcp-server --access-token $LAUNCHDARKLY_ACCESS_TOKEN
+
+### Alternative: Add to config file
+
+Create/edit `.kiro/settings/mcp.json` in your project:
+
+```json
+{
+  "mcpServers": {
+    "launchdarkly": {
+      "command": "npx",
+      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "api-YOUR-TOKEN-HERE"]
+    }
+  }
+}
 ```
 
-### 1c. Verify
+### 1c. Restart Kiro CLI
 
+Exit and restart `kiro-cli` to pick up the new MCP server.
+
+### 1d. Verify
+
+In Kiro CLI:
 ```
 /mcp list
 ```
@@ -198,11 +218,12 @@ Check your token is set:
 echo $LAUNCHDARKLY_ACCESS_TOKEN
 ```
 
-If empty, run the export command again, then reconnect:
+If empty, run the export command again. Then re-add the MCP server:
+```bash
+kiro-cli mcp add --name launchdarkly --command npx --args "-y" "@launchdarkly/mcp-server" "--access-token" "$LAUNCHDARKLY_ACCESS_TOKEN"
 ```
-/mcp remove launchdarkly
-/mcp add launchdarkly npx -y @launchdarkly/mcp-server --access-token $LAUNCHDARKLY_ACCESS_TOKEN
-```
+
+Then restart `kiro-cli`.
 
 ### "SDK key not found"
 
