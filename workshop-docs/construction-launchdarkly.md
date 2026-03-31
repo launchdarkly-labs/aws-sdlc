@@ -16,44 +16,35 @@ By the end of this section:
 
 ## Step 1: Connect LaunchDarkly to Kiro CLI
 
-### 1a. Set your API token
+### 1a. Create the MCP config file
 
-In your **bash terminal**, set your API token:
-
-```bash
-export LAUNCHDARKLY_ACCESS_TOKEN="api-YOUR-TOKEN-HERE"
-```
-
-Replace with your actual token from the Setup Guide.
-
-### 1b. Connect the MCP server
-
-In your **bash terminal**, run:
+In your **bash terminal**, run these commands (replace `api-YOUR-TOKEN` with your actual token):
 
 ```bash
-kiro-cli mcp add --name launchdarkly --command npx --args "-y" "@launchdarkly/mcp-server" "--access-token" "$LAUNCHDARKLY_ACCESS_TOKEN"
-```
-
-### Alternative: Add to config file
-
-Create/edit `.kiro/settings/mcp.json` in your project:
-
-```json
+mkdir -p .kiro/settings
+cat > .kiro/settings/mcp.json << 'EOF'
 {
   "mcpServers": {
     "launchdarkly": {
       "command": "npx",
-      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "api-YOUR-TOKEN-HERE"]
+      "args": ["-y", "@launchdarkly/mcp-server", "--access-token", "api-YOUR-TOKEN"]
     }
   }
 }
+EOF
 ```
 
-### 1c. Restart Kiro CLI
+**Important**: Edit the file to replace `api-YOUR-TOKEN` with your actual API token.
 
-Exit and restart `kiro-cli` to pick up the new MCP server.
+### 1b. Restart Kiro CLI
 
-### 1d. Verify
+Exit Kiro CLI (type `exit` or Ctrl+C) and restart it:
+
+```bash
+kiro-cli
+```
+
+### 1c. Verify
 
 In Kiro CLI:
 ```
@@ -213,17 +204,15 @@ Continue to [Operations Phase LaunchDarkly](./operations-launchdarkly.md) to add
 
 ### MCP not connecting
 
-Check your token is set:
+Check your config file exists and has the right token:
 ```bash
-echo $LAUNCHDARKLY_ACCESS_TOKEN
+cat .kiro/settings/mcp.json
 ```
 
-If empty, run the export command again. Then re-add the MCP server:
-```bash
-kiro-cli mcp add --name launchdarkly --command npx --args "-y" "@launchdarkly/mcp-server" "--access-token" "$LAUNCHDARKLY_ACCESS_TOKEN"
-```
-
-Then restart `kiro-cli`.
+Make sure:
+- The token starts with `api-` (not `sdk-`)
+- The JSON is valid (no trailing commas)
+- You restarted `kiro-cli` after creating the file
 
 ### "SDK key not found"
 
