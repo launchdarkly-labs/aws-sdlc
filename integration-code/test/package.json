@@ -1,0 +1,14 @@
+{
+  "name": "launchdarkly-bedrock-test",
+  "version": "1.0.0",
+  "description": "Test LaunchDarkly AI Config + Bedrock integration",
+  "type": "module",
+  "scripts": {
+    "test": "node test-recommendations.js"
+  },
+  "dependencies": {
+    "@launchdarkly/node-server-sdk": "^9.7.1",
+    "@launchdarkly/server-sdk-ai": "^0.2.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.712.0"
+  }
+}
