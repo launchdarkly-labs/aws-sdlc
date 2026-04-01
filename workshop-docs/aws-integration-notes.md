@@ -37,6 +37,22 @@ new iam.PolicyStatement({
 })
 ```
 
+**IAM Note for Workshop Roles:** The `WSParticipantRole` may need additional Bedrock permissions. If participants see:
+```
+User: arn:aws:sts::343218213661:assumed-role/WSParticipantRole/Participant is not authorized
+to perform: bedrock:ListMarketplaceModelEndpoints because no identity-based policy allows
+the bedrock:ListMarketplaceModelEndpoints action
+```
+
+Add these actions to the participant role policy:
+```typescript
+actions: [
+  'bedrock:InvokeModel',
+  'bedrock:ListMarketplaceModelEndpoints',
+  'bedrock:ListFoundationModels'
+]
+```
+
 ### 3. DynamoDB Tables
 
 The recommendations handler reads from existing tables:
