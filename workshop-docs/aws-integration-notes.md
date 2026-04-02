@@ -81,7 +81,7 @@ If using a shared `package.json`, these dependencies are needed:
 
 ```json
 {
-  "@launchdarkly/node-server-sdk": "^9.7.1",
+  "@launchdarkly/node-server-sdk": "^9.10.10",
   "@launchdarkly/server-sdk-ai": "^0.16.7"
 }
 ```

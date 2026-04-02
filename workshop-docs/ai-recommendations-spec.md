@@ -15,7 +15,7 @@ Add a `/recommendations` endpoint that uses **Amazon Bedrock** + **LaunchDarkly 
 
 ```json
 {
-  "@launchdarkly/node-server-sdk": "^9.7.1",
+  "@launchdarkly/node-server-sdk": "^9.10.10",
   "@launchdarkly/server-sdk-ai": "^0.16.7",
   "@aws-sdk/client-bedrock-runtime": "^3.712.0",
   "@aws-sdk/client-dynamodb": "^3.712.0",
