@@ -1,22 +1,24 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { DynamoDBDocumentClient, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { SSMClient, GetParameterCommand } from '@aws-sdk/client-ssm';
-import * as LaunchDarkly from '@launchdarkly/node-server-sdk';
-import { init as initAI, LDAIClient } from '@launchdarkly/server-sdk-ai';
+import { init as initLD, LDClient, LDContext } from '@launchdarkly/node-server-sdk';
+import { initAi, LDAIClient, LDAIConfigTracker } from '@launchdarkly/server-sdk-ai';
 
-// AWS Clients
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const bedrockClient = new BedrockRuntimeClient({ region: process.env.AWS_REGION || 'us-east-1' });
 const ssmClient = new SSMClient({ region: process.env.AWS_REGION || 'us-east-1' });
 
-// LaunchDarkly client (singleton)
-let ldClient: LaunchDarkly.LDClient | null = null;
+let ldClient: LDClient | null = null;
 let aiClient: LDAIClient | null = null;
 
-// Default model if LaunchDarkly is not configured
+const AI_CONFIG_KEY = 'book-recommendations';
+const SDK_KEY_SSM_PARAM = '/anycompanyread/launchdarkly/sdk-key';
 const DEFAULT_MODEL_ID = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0';
+const DEFAULT_INSTRUCTIONS =
+  'You are a book recommendation assistant. Suggest 3 books based on the user reading history.';
+const DEFAULT_MAX_RECOMMENDATIONS = 3;
 
 interface BookRecommendation {
   bookId: string;
@@ -25,215 +27,184 @@ interface BookRecommendation {
   reason: string;
 }
 
-/**
- * Initialize LaunchDarkly client
- */
+interface ResolvedAIConfig {
+  modelId: string;
+  instructions: string;
+  maxRecommendations: number;
+  temperature: number;
+  maxTokens: number;
+  tracker: LDAIConfigTracker | null;
+}
+
 async function initLaunchDarkly(): Promise<void> {
   if (ldClient) return;
 
-  try {
-    // Get SDK key from AWS SSM
-    const response = await ssmClient.send(
-      new GetParameterCommand({
-        Name: '/anycompanyread/launchdarkly/sdk-key',
-        WithDecryption: true,
-      })
-    );
+  let sdkKey: string | undefined = process.env.LAUNCHDARKLY_SDK_KEY;
 
-    const sdkKey = response.Parameter?.Value;
-    if (!sdkKey) {
-      console.log('[LaunchDarkly] SDK key not found in SSM, using default model');
-      return;
+  if (!sdkKey) {
+    try {
+      const ssmResponse = await ssmClient.send(
+        new GetParameterCommand({ Name: SDK_KEY_SSM_PARAM, WithDecryption: true })
+      );
+      sdkKey = ssmResponse.Parameter?.Value;
+    } catch (error) {
+      console.log('[LaunchDarkly] Failed to fetch SDK key from SSM:', error);
     }
-
-    ldClient = LaunchDarkly.init(sdkKey);
-    await ldClient.waitForInitialization();
-    aiClient = initAI(ldClient);
-    console.log('[LaunchDarkly] Client initialized successfully');
-  } catch (error) {
-    console.log('[LaunchDarkly] Failed to initialize:', error);
   }
+
+  if (!sdkKey) {
+    console.log('[LaunchDarkly] No SDK key available; using defaults');
+    return;
+  }
+
+  ldClient = initLD(sdkKey);
+  await ldClient.waitForInitialization({ timeout: 5 });
+  aiClient = initAi(ldClient);
+  console.log('[LaunchDarkly] Initialized');
 }
 
-/**
- * Get AI model configuration from LaunchDarkly
- */
-async function getModelConfig(userId: string): Promise<{ modelId: string; instructions: string }> {
-  if (!aiClient || !ldClient) {
+async function resolveAIConfig(userId: string): Promise<ResolvedAIConfig> {
+  if (!aiClient) {
     return {
       modelId: DEFAULT_MODEL_ID,
-      instructions: 'You are a book recommendation assistant. Suggest 3 books based on the user reading history.',
+      instructions: DEFAULT_INSTRUCTIONS,
+      maxRecommendations: DEFAULT_MAX_RECOMMENDATIONS,
+      temperature: 0.5,
+      maxTokens: 1024,
+      tracker: null,
     };
   }
 
-  try {
-    const context = {
-      kind: 'user',
-      key: userId,
-    };
+  const context: LDContext = { kind: 'user', key: userId };
 
-    // Get AI Config from LaunchDarkly
-    const config = await aiClient.config(
-      'book-recommendations', // AI Config key
+  try {
+    const config = await aiClient.completionConfig(
+      AI_CONFIG_KEY,
       context,
       {
-        model: { name: DEFAULT_MODEL_ID },
         enabled: true,
-      },
-      { instructions: 'You are a book recommendation assistant.' }
+        model: { name: DEFAULT_MODEL_ID, parameters: { temperature: 0.5, maxTokens: 1024 } },
+        messages: [{ role: 'system', content: DEFAULT_INSTRUCTIONS }],
+      }
     );
 
-    if (config.enabled && config.model?.name) {
-      console.log(`[LaunchDarkly] Using model: ${config.model.name}`);
+    if (config.enabled) {
       return {
-        modelId: config.model.name,
-        instructions: config.messages?.[0]?.content || 'You are a book recommendation assistant.',
+        modelId: config.model?.name ?? DEFAULT_MODEL_ID,
+        instructions: config.messages?.[0]?.content ?? DEFAULT_INSTRUCTIONS,
+        maxRecommendations:
+          (config.model?.custom?.maxRecommendations as number) ?? DEFAULT_MAX_RECOMMENDATIONS,
+        temperature: (config.model?.parameters?.temperature as number) ?? 0.5,
+        maxTokens: (config.model?.parameters?.maxTokens as number) ?? 1024,
+        tracker: config.tracker,
       };
     }
   } catch (error) {
-    console.log('[LaunchDarkly] Error getting config:', error);
+    console.log('[LaunchDarkly] completionConfig error:', error);
   }
 
   return {
     modelId: DEFAULT_MODEL_ID,
-    instructions: 'You are a book recommendation assistant.',
+    instructions: DEFAULT_INSTRUCTIONS,
+    maxRecommendations: DEFAULT_MAX_RECOMMENDATIONS,
+    temperature: 0.5,
+    maxTokens: 1024,
+    tracker: null,
   };
 }
 
-/**
- * Get user's order history from DynamoDB
- */
 async function getUserOrderHistory(userId: string): Promise<string[]> {
   try {
     const result = await dynamoClient.send(
       new QueryCommand({
         TableName: process.env.ORDERS_TABLE || 'Orders',
         KeyConditionExpression: 'userId = :userId',
-        ExpressionAttributeValues: {
-          ':userId': userId,
-        },
+        ExpressionAttributeValues: { ':userId': userId },
         Limit: 10,
       })
     );
 
-    // Extract book titles from orders
-    const bookTitles: string[] = [];
+    const titles: string[] = [];
     for (const order of result.Items || []) {
-      for (const item of order.items || []) {
-        if (item.title) {
-          bookTitles.push(item.title);
-        }
+      for (const item of (order.items as Array<{ title?: string }> | undefined) || []) {
+        if (item.title) titles.push(item.title);
       }
     }
-
-    return bookTitles;
+    return titles;
   } catch (error) {
     console.log('[Orders] Error fetching order history:', error);
     return [];
   }
 }
 
-/**
- * Get book catalog for context
- */
-async function getBookCatalog(): Promise<Array<{ bookId: string; title: string; author: string; genre: string }>> {
+async function getBookCatalog(): Promise<
+  Array<{ bookId: string; title: string; author: string; genre?: string }>
+> {
   try {
     const result = await dynamoClient.send(
-      new QueryCommand({
+      new ScanCommand({
         TableName: process.env.BOOKS_TABLE || 'Books',
         Limit: 50,
       })
     );
 
-    return (result.Items || []).map((book) => ({
-      bookId: book.bookId,
-      title: book.title,
-      author: book.author,
-      genre: book.genre,
+    return (result.Items || []).map((book: Record<string, unknown>) => ({
+      bookId: book.bookId as string,
+      title: book.title as string,
+      author: book.author as string,
+      genre: book.genre as string | undefined,
     }));
   } catch (error) {
     console.log('[Books] Error fetching catalog:', error);
-    // Return some sample books for demo
-    return [
-      { bookId: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', genre: 'Fiction' },
-      { bookId: '2', title: 'To Kill a Mockingbird', author: 'Harper Lee', genre: 'Fiction' },
-      { bookId: '3', title: 'Sapiens', author: 'Yuval Noah Harari', genre: 'Non-Fiction' },
-      { bookId: '4', title: 'Atomic Habits', author: 'James Clear', genre: 'Self-Help' },
-      { bookId: '5', title: 'The Midnight Library', author: 'Matt Haig', genre: 'Fiction' },
-    ];
+    return [];
   }
 }
 
-/**
- * Call Bedrock Claude to generate recommendations
- */
 async function generateRecommendations(
-  modelId: string,
-  instructions: string,
+  resolved: ResolvedAIConfig,
   orderHistory: string[],
-  catalog: Array<{ bookId: string; title: string; author: string; genre: string }>
+  catalog: Array<{ bookId: string; title: string; author: string; genre?: string }>
 ): Promise<BookRecommendation[]> {
-  const prompt = `${instructions}
-
-User's previously purchased books:
+  const userPrompt = `User's previously purchased books:
 ${orderHistory.length > 0 ? orderHistory.join(', ') : 'No purchase history yet'}
 
 Available books in our catalog:
-${catalog.map((b) => `- "${b.title}" by ${b.author} (${b.genre}) [ID: ${b.bookId}]`).join('\n')}
+${catalog.map((b) => `- "${b.title}" by ${b.author} (${b.genre || 'General'}) [ID: ${b.bookId}]`).join('\n')}
 
-Based on the user's reading history (or popular choices if no history), recommend exactly 3 books from the catalog.
-For each book, explain why it would appeal to this reader.
+Recommend exactly ${resolved.maxRecommendations} books from the catalog. For each book, explain why it would appeal to this reader.
 
-Respond in this exact JSON format:
-{
-  "recommendations": [
-    {"bookId": "1", "title": "Book Title", "author": "Author Name", "reason": "Why this book is recommended"}
-  ]
-}`;
+Respond ONLY with JSON in this exact format:
+{"recommendations":[{"bookId":"id","title":"Title","author":"Author","reason":"Why"}]}`;
 
-  try {
-    const response = await bedrockClient.send(
-      new InvokeModelCommand({
-        modelId: modelId,
-        contentType: 'application/json',
-        accept: 'application/json',
-        body: JSON.stringify({
-          anthropic_version: 'bedrock-2023-05-31',
-          max_tokens: 1024,
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-        }),
+  const invokeBedrock = () =>
+    bedrockClient.send(
+      new ConverseCommand({
+        modelId: resolved.modelId,
+        system: [{ text: resolved.instructions }],
+        messages: [{ role: 'user', content: [{ text: userPrompt }] }],
+        inferenceConfig: {
+          temperature: resolved.temperature,
+          maxTokens: resolved.maxTokens,
+        },
       })
     );
 
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const content = responseBody.content[0].text;
+  const response = resolved.tracker
+    ? await resolved.tracker.trackBedrockConverseMetrics(invokeBedrock)
+    : await invokeBedrock();
 
-    // Parse JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return parsed.recommendations || [];
-    }
-  } catch (error) {
-    console.error('[Bedrock] Error generating recommendations:', error);
+  const text = response.output?.message?.content?.[0]?.text ?? '';
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return [];
+
+  try {
+    const parsed = JSON.parse(match[0]);
+    return parsed.recommendations ?? [];
+  } catch {
+    return [];
   }
-
-  // Fallback recommendations
-  return [
-    { bookId: '1', title: 'The Great Gatsby', author: 'F. Scott Fitzgerald', reason: 'A timeless classic' },
-    { bookId: '3', title: 'Sapiens', author: 'Yuval Noah Harari', reason: 'Fascinating look at human history' },
-    { bookId: '4', title: 'Atomic Habits', author: 'James Clear', reason: 'Practical self-improvement' },
-  ];
 }
 
-/**
- * Lambda handler for book recommendations
- */
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -241,36 +212,28 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     'Access-Control-Allow-Methods': 'GET,OPTIONS',
   };
 
-  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
   }
 
   try {
-    // Get user ID from JWT claims
     const userId = event.requestContext.authorizer?.claims?.sub || 'anonymous';
 
-    // Initialize LaunchDarkly
     await initLaunchDarkly();
-
-    // Get model configuration from LaunchDarkly
-    const { modelId, instructions } = await getModelConfig(userId);
-
-    // Get user's order history
-    const orderHistory = await getUserOrderHistory(userId);
-
-    // Get book catalog
-    const catalog = await getBookCatalog();
-
-    // Generate recommendations using AI
-    const recommendations = await generateRecommendations(modelId, instructions, orderHistory, catalog);
+    const resolved = await resolveAIConfig(userId);
+    const [orderHistory, catalog] = await Promise.all([
+      getUserOrderHistory(userId),
+      getBookCatalog(),
+    ]);
+    const recommendations = await generateRecommendations(resolved, orderHistory, catalog);
 
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
         recommendations,
-        model: modelId, // Include model ID so UI can show which model was used
+        model: resolved.modelId,
+        maxRecommendations: resolved.maxRecommendations,
       }),
     };
   } catch (error) {

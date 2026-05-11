@@ -11,6 +11,8 @@ export interface RecommendationsConstructProps {
   authorizer: apigateway.CognitoUserPoolsAuthorizer;
   ordersTable: dynamodb.ITable;
   booksTable: dynamodb.ITable;
+  /** SSM parameter path that stores the LaunchDarkly SDK key (SecureString). */
+  ldSdkKeyParameterName?: string;
 }
 
 export class RecommendationsConstruct extends Construct {
@@ -19,9 +21,11 @@ export class RecommendationsConstruct extends Construct {
   constructor(scope: Construct, id: string, props: RecommendationsConstructProps) {
     super(scope, id);
 
-    // Create the recommendations Lambda function
+    const ldSdkKeyParameterName =
+      props.ldSdkKeyParameterName ?? '/anycompanyread/launchdarkly/sdk-key';
+
     this.recommendationsLambda = new nodejs.NodejsFunction(this, 'RecommendationsHandler', {
-      runtime: lambda.Runtime.NODEJS_18_X,
+      runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler',
       entry: '../backend/src/handlers/recommendations-handler.ts',
       timeout: cdk.Duration.seconds(30),
@@ -29,39 +33,37 @@ export class RecommendationsConstruct extends Construct {
       environment: {
         ORDERS_TABLE: props.ordersTable.tableName,
         BOOKS_TABLE: props.booksTable.tableName,
+        LD_SDK_KEY_PARAM: ldSdkKeyParameterName,
       },
       bundling: {
         externalModules: ['@aws-sdk/*'],
-        nodeModules: [
-          '@launchdarkly/node-server-sdk',
-          '@launchdarkly/server-sdk-ai',
-        ],
+        nodeModules: ['@launchdarkly/node-server-sdk', '@launchdarkly/server-sdk-ai'],
       },
     });
 
-    // Grant permissions to read from DynamoDB tables
     props.ordersTable.grantReadData(this.recommendationsLambda);
     props.booksTable.grantReadData(this.recommendationsLambda);
 
-    // Grant permissions to read SSM parameter (LaunchDarkly SDK key)
     this.recommendationsLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [
-          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/anycompanyread/launchdarkly/*`,
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter${ldSdkKeyParameterName}`,
         ],
       })
     );
 
-    // Grant permissions to invoke Bedrock models
     this.recommendationsLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:InvokeModel'],
-        resources: ['*'], // Bedrock models don't have specific ARNs
+        resources: [
+          `arn:aws:bedrock:${cdk.Stack.of(this).region}::foundation-model/*`,
+          `arn:aws:bedrock:*::foundation-model/*`,
+          `arn:aws:bedrock:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:inference-profile/*`,
+        ],
       })
     );
 
-    // Add API Gateway endpoint
     const recommendationsResource = props.api.root.addResource('recommendations');
 
     recommendationsResource.addMethod(
@@ -73,9 +75,8 @@ export class RecommendationsConstruct extends Construct {
       }
     );
 
-    // Add CORS
     recommendationsResource.addCorsPreflight({
-      allowOrigins: ['*'],
+      allowOrigins: apigateway.Cors.ALL_ORIGINS,
       allowMethods: ['GET', 'OPTIONS'],
       allowHeaders: ['Content-Type', 'Authorization'],
     });

@@ -1,12 +1,12 @@
 # Test LaunchDarkly + Bedrock Integration
 
-Test the AI recommendations locally before integrating into the workshop.
+Run the AI recommendations integration locally before adding it to the AnyCompanyRead app.
 
 ## Prerequisites
 
-1. **LaunchDarkly SDK Key** (starts with `sdk-`)
-2. **AWS credentials** with Bedrock access
-3. **Node.js** 18+
+1. **LaunchDarkly SDK Key** (starts with `sdk-`) for the `anycompanyread` project
+2. **AWS credentials** with Bedrock model access for Claude Sonnet 3.5
+3. **Node.js** 20+
 
 ## Setup
 
@@ -15,47 +15,31 @@ cd integration-code/test
 npm install
 ```
 
-## Create AI Config in LaunchDarkly
+## Create the AI Config in LaunchDarkly
 
-1. Go to LaunchDarkly → AI Configs
-2. Create new config:
-   - **Key:** `book-recommendations`
-   - **Mode:** Completion
-3. Add variations:
+1. Go to LaunchDarkly → AI Configs → Create
+2. **Key:** `book-recommendations`, **Mode:** Completion
+3. Add two variations:
 
-| Name | Model ID |
-|------|----------|
-| sonnet | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` |
-| opus | `us.anthropic.claude-opus-4-20250514-v1:0` |
+| Variation key | Model ID | Temperature | Custom: `maxRecommendations` |
+|---|---|---|---|
+| `safe-sonnet` | `us.anthropic.claude-3-5-sonnet-20241022-v2:0` | 0.2 | 3 |
+| `adventurous-opus` | `us.anthropic.claude-opus-4-20250514-v1:0` | 0.95 | 5 |
 
-4. Set default targeting to serve "sonnet"
+4. Set default targeting to serve `safe-sonnet`.
 
-## Run Test
+## Run
 
 ```bash
-export LAUNCHDARKLY_SDK_KEY="sdk-your-key"
+export LAUNCHDARKLY_SDK_KEY="sdk-..."
+export AWS_REGION="us-east-1"
 npm test
 ```
 
-## Expected Output
+## Test the live model switch
 
-```
-🚀 LaunchDarkly + Bedrock Integration Test
+1. Run the test → note which titles come back.
+2. In LaunchDarkly → AI Configs → `book-recommendations` → Targeting → change default to `adventurous-opus`.
+3. Run `npm test` again → recommendations should be more adventurous (different titles, more detail).
 
-✅ LaunchDarkly connected!
-✅ AI Config found!
-   Model: us.anthropic.claude-3-5-sonnet-20241022-v2:0
-
-📚 Generating Book Recommendations
-
-📖 Recommendation 1:
-   Title: Brave New World
-   Author: Aldous Huxley
-   Reason: Based on your interest in dystopian classics...
-```
-
-## Test Model Switching
-
-1. Run the test → note the recommendations
-2. Go to LaunchDarkly → change targeting to "opus"
-3. Run the test again → recommendations should be more detailed!
+No redeploy, no code change.
