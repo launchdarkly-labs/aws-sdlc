@@ -1,36 +1,58 @@
 /**
- * LaunchDarkly Feature Flags for React
+ * LaunchDarkly feature flags for the AnyCompanyRead React frontend.
+ *
+ * The workshop's generated frontend uses Vite + Cloudscape and reads its
+ * runtime config from /config.json (apiUrl, etc.). Drop `ldClientSideId`
+ * into that file when you deploy so the SDK can wire up.
+ *
+ * SDK: launchdarkly-react-client-sdk ^3.9.1
  */
 
-import React from 'react';
-import { useFlags, useLDClient, LDProvider } from 'launchdarkly-react-client-sdk';
+import React, { useEffect, useState } from 'react';
+import {
+  LDProvider,
+  useFlags,
+  useLDClient,
+  asyncWithLDProvider,
+} from 'launchdarkly-react-client-sdk';
 
-const LD_CLIENT_SIDE_ID = process.env.REACT_APP_LD_CLIENT_SIDE_ID || '';
-
-// Types
+// ---------- Types ----------
 interface User {
   id: string;
-  email: string;
-  plan: 'free' | 'pro' | 'enterprise';
+  email?: string;
 }
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
+interface RuntimeConfig {
+  apiUrl: string;
+  ldClientSideId: string;
 }
 
-// Provider wrapper
-export function AppWithLaunchDarkly({ user, children }: { user: User | null; children: React.ReactNode }) {
+interface AppFlags {
+  newBookCardDesign: boolean;
+  showRecommendationReasons: boolean;
+  checkoutFlowVersion: 'v1' | 'v2' | 'v3';
+}
+
+// ---------- Provider (sync wrapper) ----------
+//
+// Use this when the runtime config is already resolved (e.g. from a top-level
+// loader). For full SSR-safe init, prefer `asyncWithLDProvider` below.
+export function AppWithLaunchDarkly({
+  config,
+  user,
+  children,
+}: {
+  config: RuntimeConfig;
+  user: User | null;
+  children: React.ReactNode;
+}) {
   return (
     <LDProvider
-      clientSideID={LD_CLIENT_SIDE_ID}
+      clientSideID={config.ldClientSideId}
       context={{
         kind: 'user',
-        key: user?.id || 'anonymous',
+        key: user?.id ?? 'anonymous',
         email: user?.email,
-        custom: { plan: user?.plan || 'free' },
       }}
     >
       {children}
@@ -38,46 +60,70 @@ export function AppWithLaunchDarkly({ user, children }: { user: User | null; chi
   );
 }
 
-// Checkout with feature flag
-export function Checkout({ items, onComplete }: { items: CartItem[]; onComplete: () => void }) {
-  const { newCheckoutFlow } = useFlags();
-  const ldClient = useLDClient();
+// ---------- Provider (async — initializes before first render) ----------
+//
+// Call at app bootstrap; the returned component already has the SDK initialized.
+//   const LDApp = await initLaunchDarkly(config, currentUser);
+//   ReactDOM.createRoot(...).render(<LDApp><App /></LDApp>);
+export async function initLaunchDarkly(config: RuntimeConfig, user: User | null) {
+  return asyncWithLDProvider({
+    clientSideID: config.ldClientSideId,
+    context: {
+      kind: 'user',
+      key: user?.id ?? 'anonymous',
+      email: user?.email,
+    },
+  });
+}
 
-  const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-  const handleComplete = () => {
-    ldClient?.track('checkout-completed', { total });
-    onComplete();
-  };
-
-  if (newCheckoutFlow) {
-    return (
-      <div className="new-checkout">
-        <h2>Checkout</h2>
-        {items.map(item => (
-          <div key={item.id}>{item.name} - ${item.price} × {item.quantity}</div>
-        ))}
-        <p>Total: ${total.toFixed(2)}</p>
-        <button onClick={handleComplete}>Complete Purchase</button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="legacy-checkout">
-      <h2>Checkout</h2>
-      <div className="steps">1. Cart → 2. Shipping → 3. Payment → 4. Confirm</div>
-      {items.map(item => (
-        <div key={item.id}>{item.name} - ${item.price} × {item.quantity}</div>
-      ))}
-      <p>Total: ${total.toFixed(2)}</p>
-      <button onClick={handleComplete}>Proceed</button>
+// ---------- Example: A/B test the book card design ----------
+export function BookCard({ book }: { book: { id: string; title: string; author: string } }) {
+  const { newBookCardDesign } = useFlags<AppFlags>();
+  return newBookCardDesign ? (
+    <article className="book-card book-card--v2">
+      <h3>{book.title}</h3>
+      <p className="author">{book.author}</p>
+    </article>
+  ) : (
+    <div className="book-card-legacy">
+      <strong>{book.title}</strong> — {book.author}
     </div>
   );
 }
 
-// Premium badge
-export function PremiumBadge() {
-  const { premiumFeatures } = useFlags();
-  return premiumFeatures ? <span className="premium-badge">⭐ Premium</span> : null;
+// ---------- Example: toggle a piece of UI copy ----------
+export function RecommendationReason({ reason }: { reason: string }) {
+  const { showRecommendationReasons } = useFlags<AppFlags>();
+  if (!showRecommendationReasons) return null;
+  return <p className="recommendation-reason">{reason}</p>;
 }
+
+// ---------- Example: multivariate string flag + custom event ----------
+export function Checkout({ onComplete }: { onComplete: () => void }) {
+  const { checkoutFlowVersion } = useFlags<AppFlags>();
+  const ldClient = useLDClient();
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    setSubmitting(true);
+    ldClient?.track('checkout-completed', { variant: checkoutFlowVersion });
+    onComplete();
+  };
+
+  return (
+    <div data-variant={checkoutFlowVersion}>
+      {checkoutFlowVersion === 'v3' ? (
+        <SinglePageCheckout onSubmit={submit} disabled={submitting} />
+      ) : checkoutFlowVersion === 'v2' ? (
+        <TwoStepCheckout onSubmit={submit} disabled={submitting} />
+      ) : (
+        <LegacyCheckout onSubmit={submit} disabled={submitting} />
+      )}
+    </div>
+  );
+}
+
+// ---------- Stub components used in the multivariate example ----------
+function SinglePageCheckout(_: { onSubmit: () => void; disabled: boolean }) { return null; }
+function TwoStepCheckout(_: { onSubmit: () => void; disabled: boolean }) { return null; }
+function LegacyCheckout(_: { onSubmit: () => void; disabled: boolean }) { return null; }

@@ -1,164 +1,232 @@
-# LaunchDarkly Integration - Participant Instructions
+# LaunchDarkly Integration — Participant Instructions
 
-This document tells workshop participants what to do and when. Insert these instructions into the existing AWS AI-DLC workshop at the specified points.
+These instructions slot into the [AWS AI-DLC workshop](https://catalog.workshops.aws/ai-driven-development-lifecycle). Insert each block at the workshop step indicated by the **`INSERT INTO`** heading.
+
+The new workshop drives the build through **Kiro CLI** and produces a monorepo with `packages/backend/` (Node 20 Lambdas), `packages/frontend/` (React + Cloudscape), `packages/shared/`, and `packages/cdk/`. All references below match that layout.
 
 ---
 
 ## Why LaunchDarkly?
 
-LaunchDarkly enables **runtime configuration** of your AI applications—change models, prompts, and features **without redeploying**. This means:
+LaunchDarkly lets you change models, prompts, and features at runtime — no redeploy:
 
-- **Faster iteration**: Test different AI behaviors instantly
-- **Reduced risk**: Roll back changes in seconds, not hours
-- **A/B testing**: Compare model performance with real users
-- **Gradual rollouts**: Ship confidently with percentage-based releases
+- **Faster iteration** — test different AI behaviors instantly
+- **Reduced risk** — roll back in seconds, not hours
+- **A/B testing** — compare model performance with real users
+- **Gradual rollouts** — ship confidently with percentage-based releases
 
-In this workshop, you'll use **AI Configs** to control AI model behavior and **Feature Flags** for progressive delivery—core capabilities that accelerate development cycles.
+In this workshop you use **AI Configs** to control the recommendations model and **Feature Flags** for progressive UI delivery.
 
-📚 **Learn more**: [LaunchDarkly AI Configs Documentation](https://docs.launchdarkly.com/home/ai-configs)
+[AI Configs docs](https://docs.launchdarkly.com/home/ai-configs) · [Agent skills](https://skills.sh/launchdarkly/agent-skills)
 
 ---
 
-## INSERT INTO: Workshop Setup / Prerequisites
+## INSERT INTO: Workshop Setup → Prerequisites
 
 ### LaunchDarkly Account Setup
 
-1. **Create a LaunchDarkly account**
-   - Go to https://launchdarkly.com and sign up for a free trial
-   - Verify your email
-
-2. **Get your API Token** ([Documentation](https://docs.launchdarkly.com/home/account/api))
+1. **Create a LaunchDarkly account** at https://launchdarkly.com/start-trial (verify your email)
+2. **Get your API Token** ([docs](https://docs.launchdarkly.com/home/account/api))
    - Account Settings → Authorization → Create token
    - Format: `api-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
-   - Save this - you'll need it during Inception
+   - Save it — you'll use it from Kiro CLI during Inception
+
+### (Recommended) Drop the LaunchDarkly Steering File into Kiro
+
+Kiro auto-loads any markdown in `.kiro/steering/`. Copy this repo's steering file into your workshop project once:
+
+```bash
+mkdir -p .kiro/steering
+cp /path/to/aws-aisdlc/.kiro/steering/launchdarkly-ai-configs.md .kiro/steering/
+```
+
+Now every Kiro CLI session knows the LaunchDarkly workflows for this workshop — how to create the `book-recommendations` AI Config, where to store the SDK key, which flag keys go with which Operations issue, and which agent-skill URL to pull in for each step.
+
+> Kiro does not support `npx skills add`. The pattern in this workshop is: **steering file for persistent rules + `/context add <skill-url>` for one-off skill content + MCP server for live API operations.**
+
+### (Recommended) Add the LaunchDarkly MCP Server
+
+This is the easiest path for "do it with natural language" — `"create a flag called X with a 50/50 rollout"` just works.
+
+1. Add a config block at `.kiro/settings/mcp.json` (workspace) or `~/.kiro/settings/mcp.json` (global):
+
+   ```json
+   {
+     "mcpServers": {
+       "launchdarkly": {
+         "command": "npx",
+         "args": ["-y", "@launchdarkly/mcp-server"],
+         "env": { "LAUNCHDARKLY_API_KEY": "api-your-token-here" },
+         "disabled": false
+       }
+     }
+   }
+   ```
+
+   Or via CLI: `kiro-cli mcp add --name launchdarkly --command npx --args "-y,@launchdarkly/mcp-server" --env "LAUNCHDARKLY_API_KEY=api-..."`
+
+2. Restart Kiro CLI. Verify with `/mcp` — `launchdarkly` should appear as loaded.
+
+See https://github.com/launchdarkly/mcp-server for details.
+
+### Pulling Specific Agent Skills On Demand
+
+When a workshop step calls for a particular skill (e.g. `/aiconfig-create`), pull its markdown into the current Kiro chat:
+
+```text
+/context add https://skills.sh/launchdarkly/agent-skills/aiconfig-create
+```
+
+This loads that skill's playbook for the rest of the chat without permanently installing anything. [Full skill catalog](https://skills.sh/launchdarkly/agent-skills).
 
 ---
 
-## INSERT INTO: Inception Phase > After "User Stories Creation"
+## INSERT INTO: Inception Phase → After "User Stories Creation"
 
 ### Add AI Recommendations as a Planned Feature
 
-Before workflow planning, we'll add LaunchDarkly-powered AI recommendations as a feature requirement. AI Configs let you **change models and prompts at runtime**—no redeployment needed.
+Before workflow planning, add LaunchDarkly-powered AI recommendations to the feature set. AI Configs let you change models and prompts at runtime — no redeployment.
 
-📚 **AI Configs Quickstart**: [docs.launchdarkly.com/home/ai-configs/quickstart](https://docs.launchdarkly.com/home/ai-configs/quickstart) | **Best Practices**: [docs.launchdarkly.com/guides/ai-configs/best-practices](https://docs.launchdarkly.com/guides/ai-configs/best-practices)
+[AI Configs quickstart](https://docs.launchdarkly.com/home/ai-configs/quickstart) · [Best practices](https://docs.launchdarkly.com/guides/ai-configs/best-practices)
 
-#### Step 1: (Optional) Set up LaunchDarkly MCP for Kiro
+#### Step 1 — Create the LaunchDarkly project
 
-If you want to use natural language to manage LaunchDarkly (instead of providing skills as context):
+Pick one path:
 
-1. See: https://github.com/launchdarkly/mcp-server
-2. Add to your MCP config:
-```json
-{
-  "mcpServers": {
-    "launchdarkly": {
-      "command": "npx",
-      "args": ["-y", "@launchdarkly/mcp-server"],
-      "env": {
-        "LAUNCHDARKLY_API_KEY": "api-your-token-here"
-      }
-    }
-  }
-}
-```
-3. Restart Kiro to load the MCP server
+- **Dashboard:** [Projects](https://app.launchdarkly.com/settings/projects) → Create → Name: `anycompanyread` → grab the SDK key from Project Settings → Environments → Production.
+- **Kiro + MCP:** "Create a LaunchDarkly project called `anycompanyread` and return the production SDK key."
+- **Kiro + skill on demand:** `/context add https://skills.sh/launchdarkly/agent-skills/aiconfig-projects` → "Create project `anycompanyread` and give me the production SDK key."
 
-#### Step 2: Create LaunchDarkly Project
+#### Step 2 — Create the AI Config ([docs](https://docs.launchdarkly.com/home/ai-configs))
 
-- **Via Dashboard:** [Projects](https://app.launchdarkly.com/settings/projects) → Create project → Name: `anycompanyread` → Get SDK Key from Project Settings → Environments → Production
-- **Via Kiro + LD Skills:** `/context add https://github.com/launchdarkly-labs/agent-skills/tree/main/skills/ai-configs/aiconfig-projects`, then: `"Create project anycompanyread and give me the SDK key"`
-- **Via Kiro + LD MCP:** `"Create a LaunchDarkly project called anycompanyread"`
+| Field | Value |
+|---|---|
+| Key | `book-recommendations` |
+| Mode | Completion |
+| Variation 1 | `safe-sonnet` — `us.anthropic.claude-3-5-sonnet-20241022-v2:0`, temp 0.2, custom `maxRecommendations` = 3 |
+| Variation 2 | `adventurous-opus` — `us.anthropic.claude-opus-4-20250514-v1:0`, temp 0.95, custom `maxRecommendations` = 5 |
+| Default | `safe-sonnet` |
 
-#### Step 3: Create the AI Config ([Documentation](https://docs.launchdarkly.com/home/ai-configs))
+- **Dashboard:** [AI Configs](https://app.launchdarkly.com/projects/anycompanyread/ai-configs) → Create → fill in the table above.
+- **Kiro + MCP:** "Create AI Config `book-recommendations` (completion mode) with variations `safe-sonnet` (sonnet 3.5, temp 0.2, maxRecommendations 3) and `adventurous-opus` (opus 4, temp 0.95, maxRecommendations 5). Default to `safe-sonnet`."
+- **Kiro + skill on demand:** `/context add https://skills.sh/launchdarkly/agent-skills/aiconfig-create` → same prompt as above.
 
-- **Via Dashboard:** [AI Configs](https://app.launchdarkly.com/projects/anycompanyread/ai-configs) → Create → Key: `book-recommendations`, Mode: Completion → Add variations `safe-sonnet` (temp 0.2) and `adventurous-opus` (temp 0.95) → Set default to `safe-sonnet`
-- **Via Kiro + LD Skills:** `/context add https://github.com/launchdarkly-labs/agent-skills/tree/main/skills/ai-configs/aiconfig-create`, then: `"Create AI Config book-recommendations with variations safe-sonnet (temp 0.2) and adventurous-opus (temp 0.95), default to safe-sonnet"`
-- **Via Kiro + LD MCP:** `"Create AI Config book-recommendations with two variations: safe-sonnet (temp 0.2) and adventurous-opus (temp 0.95). Set default to safe-sonnet."`
+> **Already have AI Configs in another LD project?** `/context add https://skills.sh/launchdarkly/agent-skills/aiconfig-migrate` → "Copy AI Configs from `<source-project>` to `anycompanyread`."
 
-#### Step 4: Save Your Credentials
+#### Step 3 — Save your credentials
 
-| Credential | Format | Use |
-|------------|--------|-----|
-| **API Token** | `api-xxxxxxxx-...` | Kiro context/MCP, API calls |
-| **SDK Key** | `sdk-xxxxxxxx-...` | Lambda runtime (add to environment) |
+| Credential | Format | Where it goes |
+|---|---|---|
+| API Token | `api-...` | Kiro context / MCP server env |
+| Production SDK Key | `sdk-...` | AWS SSM (set below in Construction) |
 
 ---
 
-## INSERT INTO: Construction Phase > Before "Code Generation"
+## INSERT INTO: Construction Phase → Before "Code Generation"
 
 ### Include AI Recommendations in Code Generation
 
-Add the recommendations spec as context so it gets generated with the application:
+Add the spec as context so Kiro generates the feature as part of the AnyCompanyRead app:
 
-1. Add the spec as context: `/context add workshop-docs/ai-recommendations-spec.md`
-2. Tell the coding assistant: `"Include the AI recommendations feature from the spec in the generated application"`
+```text
+/context add workshop-docs/ai-recommendations-spec.md
+```
 
-The coding assistant will generate:
-- `handlers/recommendations-handler.ts` - Lambda with LaunchDarkly + Bedrock integration
-- CDK infrastructure updates with `LAUNCHDARKLY_SDK_KEY` environment variable
+Then prompt Kiro:
+
+```text
+Include the AI recommendations feature from the spec in the generated application,
+following the integration-code layout (packages/backend, packages/frontend,
+packages/shared, packages/cdk).
+```
+
+Kiro will produce, alongside the rest of the app:
+
+- `packages/backend/src/handlers/recommendations-handler.ts` — Lambda with LaunchDarkly + Bedrock Converse
+- `packages/frontend/src/components/RecommendationsSection.tsx` — Cloudscape card section
+- `packages/shared/src/types/recommendations.ts` — shared types
+- `packages/cdk/lib/constructs/recommendations-construct.ts` — Lambda + API + IAM + SSM read
 
 ---
 
-## INSERT INTO: Operations Phase (after deployment)
+## INSERT INTO: Construction Phase → After "Build and Test", Before "Deploy"
 
-### Part 1: Runtime AI Configuration
+### Store the SDK Key in AWS SSM
 
-This is where LaunchDarkly shines—**change AI behavior instantly without redeploying**. Test different models, adjust prompts, tune parameters—all in real-time.
+Before deploy, store the LaunchDarkly SDK key so the Lambda can read it at runtime:
 
-📚 **AI Config Targeting**: [docs.launchdarkly.com/home/ai-configs/target](https://docs.launchdarkly.com/home/ai-configs/target)
-
-**Test safe-sonnet:**
 ```bash
-curl https://your-api-gateway/recommendations
+aws ssm put-parameter \
+  --name "/anycompanyread/launchdarkly/sdk-key" \
+  --value "sdk-YOUR-PROD-SDK-KEY" \
+  --type SecureString
 ```
-You should see mainstream, bestseller-style recommendations.
 
-**Switch to adventurous-opus (NO REDEPLOY!):**
-
-- **Via Dashboard:** [AI Configs → book-recommendations](https://app.launchdarkly.com/projects/anycompanyread/ai-configs/book-recommendations) → Targeting → Change default to `adventurous-opus`
-- **Via Kiro + LD Skills:** `/context add https://github.com/launchdarkly-labs/agent-skills/tree/main/skills/ai-configs/aiconfig-targeting`, then: `"Switch book-recommendations default to adventurous-opus"`
-- **Via Kiro + LD MCP:** `"Switch book-recommendations default to adventurous-opus"`
-
-**Test again** - you should now see hidden gems and unexpected recommendations!
+The deploy step in the workshop will then bring up the Lambda with the right IAM policy already attached (from `RecommendationsConstruct`).
 
 ---
 
-### Part 2: Feature Flags for Faster Development
+## INSERT INTO: Operations Phase — Part 1 (Runtime AI Configuration)
 
-Feature flags decouple **deployment from release**—deploy code anytime, release features when ready. This enables true continuous delivery and drastically reduces release risk.
+This is where LaunchDarkly shines — **change AI behavior instantly without redeploying.**
 
-📚 **Feature Flags Overview**: [docs.launchdarkly.com/home/flags](https://docs.launchdarkly.com/home/flags)
+[AI Config targeting docs](https://docs.launchdarkly.com/home/ai-configs/target)
 
-#### Step 1: Create a Feature Flag ([Documentation](https://docs.launchdarkly.com/home/flags/create))
+**Test `safe-sonnet`** (default):
 
-- **Via Dashboard:** [Feature Flags](https://app.launchdarkly.com/projects/anycompanyread/flags) → Create → Key: `new-book-card-design` → Check "SDKs using Client-side ID" → Create
-- **Via Kiro + LD Skills:** `/context add https://github.com/launchdarkly-labs/agent-skills/tree/main/skills/feature-flags/launchdarkly-flag-create`, then: `"Create boolean flag new-book-card-design for A/B testing book card UI"`
-- **Via Kiro + LD MCP:** `"Create a boolean feature flag called new-book-card-design for A/B testing the book card UI"`
+Open the deployed app → "Recommended for You" section. You should see 3 mainstream picks with a "Powered by Claude Sonnet" badge.
 
-#### Step 2: Add to Frontend ([React SDK Docs](https://docs.launchdarkly.com/sdk/client-side/react/react-web))
+**Switch to `adventurous-opus` — no redeploy:**
 
-Ask the coding assistant:
+- **Dashboard:** [AI Configs → book-recommendations](https://app.launchdarkly.com/projects/anycompanyread/ai-configs/book-recommendations) → Targeting → change default to `adventurous-opus`.
+- **Kiro + MCP:** "Switch `book-recommendations` default to `adventurous-opus`."
+- **Kiro + skill on demand:** `/context add https://skills.sh/launchdarkly/agent-skills/aiconfig-targeting` → same prompt.
+
+**Refresh the app** → 5 hidden-gem recommendations, badge now reads "Powered by Claude Opus".
+
+Open the AI Config dashboard to see the latency, token, and cost metrics that `trackBedrockConverseMetrics` is reporting automatically.
+
+---
+
+## INSERT INTO: Operations Phase — Part 2 (Feature Flags for Faster Development)
+
+Feature flags decouple **deployment from release** — deploy code anytime, release features when ready.
+
+[Feature Flags overview](https://docs.launchdarkly.com/home/flags)
+
+#### Step 1 — Create the flag
+
+- **Dashboard:** [Feature Flags](https://app.launchdarkly.com/projects/anycompanyread/flags) → Create → Key: `new-book-card-design` → check "SDKs using Client-side ID" → Create.
+- **Kiro + MCP:** "Create boolean flag `new-book-card-design` (client-side enabled) for A/B testing the book card UI."
+- **Kiro + skill on demand:** `/context add https://skills.sh/launchdarkly/agent-skills/launchdarkly-flag-create` → same prompt.
+
+#### Step 2 — Wire it into the frontend
+
+Prompt Kiro CLI:
+
+```text
+Add LaunchDarkly to the frontend using launchdarkly-react-client-sdk.
+Read VITE_LD_CLIENT_SIDE_ID from the runtime config.json and wrap the app
+in <LDProvider>. Use the flag `new-book-card-design` to switch the
+book card component between the existing design and a new variant.
 ```
-"Add LaunchDarkly feature flags to the frontend using the new-book-card-design flag to A/B test a new book card component"
-```
 
-#### Step 3: Test the Flag
+Reference: [React SDK docs](https://docs.launchdarkly.com/sdk/client-side/react/react-web). See `examples/frontend-flags.tsx` for a minimal pattern.
 
-**Turn on with 50/50 rollout:**
-- **Via Dashboard:** [Feature Flags → new-book-card-design](https://app.launchdarkly.com/projects/anycompanyread/flags/new-book-card-design) → Turn ON → Set rollout to 50%
-- **Via Kiro + LD Skills:** `/context add https://github.com/launchdarkly-labs/agent-skills/tree/main/skills/feature-flags/launchdarkly-flag-targeting`, then: `"Turn on new-book-card-design with 50/50 rollout"`
-- **Via Kiro + LD MCP:** `"Turn on new-book-card-design with 50/50 rollout"`
+#### Step 3 — Test the flag
 
-Refresh the app - you'll randomly see old or new design. Toggle to 100% ON or OFF instantly.
+- **Dashboard:** [Feature Flags → new-book-card-design](https://app.launchdarkly.com/projects/anycompanyread/flags/new-book-card-design) → Turn ON → set rollout to 50% / 50%.
+- **Kiro + MCP:** "Turn on `new-book-card-design` with 50/50 rollout."
+- **Kiro + skill on demand:** `/context add https://skills.sh/launchdarkly/agent-skills/launchdarkly-flag-targeting` → same prompt.
 
-#### Why This Matters
+Refresh the app — you'll randomly get the old or new design. Toggle to 100% ON or OFF instantly.
 
-LaunchDarkly feature flags transform how you ship software:
-- **A/B test UI changes** without deploying—validate ideas with real users
-- **Gradual rollouts** (10% → 50% → 100%)—reduce blast radius
-- **Instant rollback** if something breaks—seconds, not hours
-- **Target specific users**—beta testers, premium users, internal teams
-- **Kill switch** for any feature—sleep better at night
+#### Why this matters
 
-📚 **Best Practices**: [docs.launchdarkly.com/guides/flags/best-practices](https://docs.launchdarkly.com/guides/flags/best-practices)
+- **A/B test UI changes** without deploying — validate ideas with real users
+- **Gradual rollouts** (10% → 50% → 100%) — reduce blast radius
+- **Instant rollback** if something breaks — seconds, not hours
+- **Target specific users** — beta testers, premium users, internal teams
+- **Kill switch** for any feature
 
+[Flag best practices](https://docs.launchdarkly.com/guides/flags/best-practices)
